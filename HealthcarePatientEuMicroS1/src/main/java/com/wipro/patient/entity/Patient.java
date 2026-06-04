@@ -3,6 +3,7 @@ package com.wipro.patient.entity;
 import jakarta.persistence.*;
 
 @Entity
+@Table(name= "patients")
 public class Patient {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -11,40 +12,48 @@ public class Patient {
     private String email;
     private int age;
     private String disease;
-	public Object getId() {
+	public Integer getId() {
 		// TODO Auto-generated method stub
-		return null;
+		return id;
 	}
-	public Object getName() {
+	public String getName() {
 		// TODO Auto-generated method stub
-		return null;
+		return name;
 	}
-	public Object getEmail() {
+	public String getEmail() {
 		// TODO Auto-generated method stub
-		return null;
+		return email;
 	}
-	public Object getDisease() {
+	public Integer getAge() {
 		// TODO Auto-generated method stub
-		return null;
+		return age;
 	}
-	public void setId(Object id2) {
+	public String getDisease() {
 		// TODO Auto-generated method stub
+		return disease;
+	}
+	public void setId(Integer id) {
+		// TODO Auto-generated method stub
+		this.id = id;
 		
 	}
-	public void setName(Object name2) {
+	public void setName(String name) {
 		// TODO Auto-generated method stub
+		this.name = name;
 		
 	}
-	public void setEmail(Object email2) {
+	public void setEmail(String email) {
 		// TODO Auto-generated method stub
+		this.email = email;
 		
 	}
-	public void setAge(Object age2) {
+	public void setAge(Integer age) {
 		// TODO Auto-generated method stub
+		this.age = age;
 		
 	}
-	public void setDisease(Object disease2) {
+	public void setDisease(String disease) {
 		// TODO Auto-generated method stub
-		
+		this.disease =disease;
 	}
 }

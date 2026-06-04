@@ -2,6 +2,8 @@ package com.healthcare.dto;
 
 import java.math.BigDecimal;
 
+import com.healthcare.entity.Patient;
+
 public class PrescriptionDTO {
 
     private Integer id;
@@ -10,13 +12,13 @@ public class PrescriptionDTO {
     private BigDecimal price;
 
     // Only patient info needed (not full entity)
-    private Integer patientId;
+    private Patient patientId;
     private String patientName;
 
     public PrescriptionDTO() {}
 
     public PrescriptionDTO(Integer id, String medicineName, String dosage,
-                           BigDecimal price, Integer patientId, String patientName) {
+                           BigDecimal price, Patient patientId, String patientName) {
         this.id = id;
         this.medicineName = medicineName;
         this.dosage = dosage;
@@ -33,8 +35,13 @@ public class PrescriptionDTO {
     public void setDosage(String dosage) { this.dosage = dosage; }
     public BigDecimal getPrice() { return price; }
     public void setPrice(BigDecimal price) { this.price = price; }
-    public Integer getPatientId() { return patientId; }
-    public void setPatientId(Integer patientId) { this.patientId = patientId; }
+    public Patient getPatientId() { return patientId; }
+    public void setPatientId(Object patient) { this.patientId = patient; }
     public String getPatientName() { return patientName; }
     public void setPatientName(String patientName) { this.patientName = patientName; }
+
+	public void setDisease(Object disease) {
+		// TODO Auto-generated method stub
+		
+	}
 }

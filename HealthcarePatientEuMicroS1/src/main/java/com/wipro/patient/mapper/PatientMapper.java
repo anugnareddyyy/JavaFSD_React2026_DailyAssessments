@@ -18,7 +18,7 @@ public class PatientMapper {
         dto.setId(p.getId());
         dto.setName(p.getName());
         dto.setEmail(p.getEmail());
-        dto.setId(p.getId());
+        dto.setAge(p.getAge());
         dto.setDisease(p.getDisease());
         return dto;
     }
@@ -26,11 +26,11 @@ public class PatientMapper {
     public Patient toEntity(PatientDTO dto) {
     	if(dto == null) return null;
         Patient p = new Patient();
-        p.setId(dto.getId());
-        p.setName(dto.getName());
-        p.setEmail(dto.getEmail());
-        p.setAge(dto.getAge());
-        p.setDisease(dto.getDisease());
+        p.setId((Integer)dto.getId());
+        p.setName((String)dto.getName());
+        p.setEmail((String)dto.getEmail());
+        p.setAge((Integer)dto.getAge());
+        p.setDisease((String)dto.getDisease());
         return p;
     }
 }

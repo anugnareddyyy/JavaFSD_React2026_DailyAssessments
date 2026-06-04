@@ -4,42 +4,16 @@ public class PatientDTO {
     private Integer id;
     private String name;
     private String email;
-    private int age;
+    private Integer age;
     private String disease;
-	public void setId(Object id2) {
-		// TODO Auto-generated method stub
-		
-	}
-	public void setName(Object name2) {
-		// TODO Auto-generated method stub
-		
-	}
-	public void setEmail(Object email2) {
-		// TODO Auto-generated method stub
-		
-	}
-	public void setDisease(Object disease2) {
-		// TODO Auto-generated method stub
-		
-	}
-	public Object getId() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-	public Object getName() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-	public Object getEmail() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-	public Object getAge() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-	public Object getDisease() {
-		// TODO Auto-generated method stub
-		return null;
-	}
+	public void setId(Integer id) {this.id = id;}
+	public void setName(String name) {this.name = name;}
+	public void setEmail(String email) {this.email = email;}
+	public void setAge(Integer age) {this.age = age;}
+	public void setDisease(String disease) {this.disease = disease;}
+	public Integer getId() {return id;}
+	public String getName() {return name;}
+	public String getEmail() {return email;}
+	public Integer getAge() {return age;}
+	public String getDisease() {return disease;}
 }

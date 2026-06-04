@@ -29,5 +29,15 @@ public class Prescription {
     public BigDecimal getPrice() { return price; }
     public void setPrice(BigDecimal price) { this.price = price; }
     public Patient getPatient() { return patient; }
-    public void setPatient(Patient patient) { this.patient = patient; }
+    public void setPatient(Object object) { this.patient = (Patient) object; }
+
+	public Object getDisease() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public void setDisease(Object disease) {
+		// TODO Auto-generated method stub
+		
+	}
 }
