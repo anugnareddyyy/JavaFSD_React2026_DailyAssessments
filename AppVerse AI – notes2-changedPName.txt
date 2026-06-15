@@ -1,0 +1,1100 @@
+Got it! ✅
+From now on everything will use:
+Project Name  : AppverseAI
+Group         : com.appverse
+Artifact      : AppverseAI
+Package       : com.appverse.ai
+
+Phase 2 - Step 7: Auth Service + Auth Controller
+Package Structure
+service/
+├── AuthService.java           → Interface
+└── impl/
+    └── AuthServiceImpl.java   → Implementation
+
+controller/
+└── AuthController.java        → REST Controller
+
+Step 1: AuthService.java (Interface)
+Package: com.appverse.ai.service
+javapackage com.appverse.ai.service;
+
+import com.appverse.ai.dto.request.ForgotPasswordRequest;
+import com.appverse.ai.dto.request.LoginRequest;
+import com.appverse.ai.dto.request.RegisterRequest;
+import com.appverse.ai.dto.request.ResetPasswordRequest;
+import com.appverse.ai.dto.request.VerifyOtpRequest;
+import com.appverse.ai.dto.response.AuthResponse;
+import com.appverse.ai.dto.response.ApiResponse;
+
+/**
+ * Service interface for Authentication operations.
+ * Defines contracts for all auth flows:
+ * Register → OTP Verify → Login
+ * Forgot Password → OTP Verify → Reset Password
+ */
+public interface AuthService {
+
+    /**
+     * Registers a new user and sends OTP to Gmail
+     * @param request - registration details
+     * @return ApiResponse with success message
+     */
+    ApiResponse<String> register(
+            RegisterRequest request
+    );
+
+    /**
+     * Verifies OTP sent during registration
+     * Activates user account on success
+     * @param request - email and OTP code
+     * @return ApiResponse with success message
+     */
+    ApiResponse<String> verifyRegistrationOtp(
+            VerifyOtpRequest request
+    );
+
+    /**
+     * Resends OTP to email if previous expired
+     * @param email - user email
+     * @return ApiResponse with success message
+     */
+    ApiResponse<String> resendOtp(String email);
+
+    /**
+     * Authenticates user with email and password
+     * Returns JWT token on success
+     * @param request - login credentials
+     * @return AuthResponse with JWT token
+     */
+    AuthResponse login(LoginRequest request);
+
+    /**
+     * Sends password reset OTP to Gmail
+     * First step of forgot password flow
+     * @param request - email address
+     * @return ApiResponse with success message
+     */
+    ApiResponse<String> forgotPassword(
+            ForgotPasswordRequest request
+    );
+
+    /**
+     * Resets password after OTP verification
+     * Final step of forgot password flow
+     * @param request - email, otp, new password
+     * @return ApiResponse with success message
+     */
+    ApiResponse<String> resetPassword(
+            ResetPasswordRequest request
+    );
+}
+
+Step 2: AuthServiceImpl.java
+Package: com.appverse.ai.service.impl
+javapackage com.appverse.ai.service.impl;
+
+import com.appverse.ai.dto.request.ForgotPasswordRequest;
+import com.appverse.ai.dto.request.LoginRequest;
+import com.appverse.ai.dto.request.RegisterRequest;
+import com.appverse.ai.dto.request.ResetPasswordRequest;
+import com.appverse.ai.dto.request.VerifyOtpRequest;
+import com.appverse.ai.dto.response.ApiResponse;
+import com.appverse.ai.dto.response.AuthResponse;
+import com.appverse.ai.entity.OtpVerification;
+import com.appverse.ai.entity.User;
+import com.appverse.ai.exception.AccountNotVerifiedException;
+import com.appverse.ai.exception.DuplicateEmailException;
+import com.appverse.ai.exception.InvalidCredentialsException;
+import com.appverse.ai.exception.InvalidOtpException;
+import com.appverse.ai.exception.OtpExpiredException;
+import com.appverse.ai.exception.UserNotFoundException;
+import com.appverse.ai.repository.OtpVerificationRepository;
+import com.appverse.ai.repository.UserRepository;
+import com.appverse.ai.security.JwtUtil;
+import com.appverse.ai.service.AuthService;
+import com.appverse.ai.service.EmailService;
+import com.appverse.ai.util.OtpUtil;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication
+        .AuthenticationManager;
+import org.springframework.security.authentication
+        .BadCredentialsException;
+import org.springframework.security.authentication
+        .UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails
+        .UserDetails;
+import org.springframework.security.crypto.password
+        .PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation
+        .Transactional;
+
+import java.time.LocalDateTime;
+
+/**
+ * Implementation of AuthService.
+ * Handles complete authentication flows:
+ *
+ * REGISTRATION FLOW:
+ * 1. Validate email not duplicate
+ * 2. Hash password with BCrypt
+ * 3. Save user (unverified)
+ * 4. Generate OTP
+ * 5. Save OTP with 5 min expiry
+ * 6. Send OTP email via Gmail SMTP
+ *
+ * VERIFY OTP FLOW:
+ * 1. Find latest OTP for email
+ * 2. Check not expired
+ * 3. Check not already used
+ * 4. Mark OTP as used
+ * 5. Activate user account
+ * 6. Send welcome email
+ *
+ * LOGIN FLOW:
+ * 1. Check user exists
+ * 2. Check account verified
+ * 3. Authenticate with Spring Security
+ * 4. Generate JWT token
+ * 5. Return token with user info
+ *
+ * FORGOT PASSWORD FLOW:
+ * 1. Check user exists
+ * 2. Generate OTP
+ * 3. Send reset OTP email
+ *
+ * RESET PASSWORD FLOW:
+ * 1. Verify OTP
+ * 2. Hash new password
+ * 3. Update in database
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class AuthServiceImpl implements AuthService {
+
+    /**
+     * User repository for database operations
+     */
+    private final UserRepository userRepository;
+
+    /**
+     * OTP repository for OTP management
+     */
+    private final OtpVerificationRepository
+            otpVerificationRepository;
+
+    /**
+     * Email service for sending OTP emails
+     */
+    private final EmailService emailService;
+
+    /**
+     * OTP utility for generation and masking
+     */
+    private final OtpUtil otpUtil;
+
+    /**
+     * JWT utility for token generation
+     */
+    private final JwtUtil jwtUtil;
+
+    /**
+     * Password encoder for BCrypt hashing
+     */
+    private final PasswordEncoder passwordEncoder;
+
+    /**
+     * Spring Security authentication manager
+     */
+    private final AuthenticationManager
+            authenticationManager;
+
+    /**
+     * OTP expiry minutes from properties
+     */
+    @Value("${app.otp.expiry.minutes}")
+    private int otpExpiryMinutes;
+
+    // =============================================
+    // REGISTRATION
+    // =============================================
+
+    /**
+     * Registers new user and sends OTP to Gmail.
+     * Validates email uniqueness before saving.
+     * Password is BCrypt hashed before storage.
+     * @param request - registration details
+     * @return success message with masked email
+     */
+    @Override
+    @Transactional
+    public ApiResponse<String> register(
+            RegisterRequest request) {
+
+        log.info("Registration attempt for email: {}",
+                request.getEmail());
+
+        // Step 1: Check email not already registered
+        if (userRepository.existsByEmail(
+                request.getEmail())) {
+            log.warn("Duplicate email registration: {}",
+                    request.getEmail());
+            throw new DuplicateEmailException(
+                    request.getEmail());
+        }
+
+        // Step 2: Validate role - ADMIN not allowed
+        if (request.getRole() == User.Role.ADMIN) {
+            log.warn("Attempt to register as ADMIN: {}",
+                    request.getEmail());
+            throw new InvalidCredentialsException(
+                    "Cannot register as ADMIN role.");
+        }
+
+        // Step 3: Build and save user (unverified)
+        User user = User.builder()
+                .name(request.getName())
+                .email(request.getEmail())
+                // BCrypt hash password
+                .password(passwordEncoder.encode(
+                        request.getPassword()))
+                .role(request.getRole())
+                // Not verified until OTP confirmed
+                .isVerified(false)
+                .isActive(true)
+                .build();
+
+        userRepository.save(user);
+        log.info("User saved (unverified): {}",
+                request.getEmail());
+
+        // Step 4: Generate and save OTP
+        String otp = generateAndSaveOtp(
+                request.getEmail(),
+                OtpVerification.OtpType.REGISTRATION
+        );
+
+        // Step 5: Send OTP email asynchronously
+        emailService.sendRegistrationOtp(
+                request.getEmail(),
+                otp,
+                request.getName()
+        );
+
+        log.info("Registration OTP sent to: {}",
+                request.getEmail());
+
+        // Return masked email in response
+        String maskedEmail = otpUtil.maskEmail(
+                request.getEmail());
+
+        return ApiResponse.success(
+                "Registration successful! OTP sent to "
+                        + maskedEmail +
+                        ". Valid for " +
+                        otpExpiryMinutes + " minutes."
+        );
+    }
+
+    // =============================================
+    // VERIFY REGISTRATION OTP
+    // =============================================
+
+    /**
+     * Verifies OTP for account activation.
+     * Marks account as verified on success.
+     * Sends welcome email after verification.
+     * @param request - email and OTP code
+     * @return success message
+     */
+    @Override
+    @Transactional
+    public ApiResponse<String> verifyRegistrationOtp(
+            VerifyOtpRequest request) {
+
+        log.info("OTP verification attempt for: {}",
+                request.getEmail());
+
+        // Step 1: Find and validate OTP
+        OtpVerification otpVerification =
+                validateOtp(
+                        request.getEmail(),
+                        request.getOtp(),
+                        OtpVerification.OtpType.REGISTRATION
+                );
+
+        // Step 2: Mark OTP as used
+        otpVerification.setUsed(true);
+        otpVerificationRepository.save(otpVerification);
+
+        // Step 3: Activate user account
+        userRepository.verifyUserByEmail(
+                request.getEmail());
+
+        log.info("Account verified successfully: {}",
+                request.getEmail());
+
+        // Step 4: Get user for welcome email
+        User user = userRepository
+                .findByEmail(request.getEmail())
+                .orElseThrow(() ->
+                        new UserNotFoundException(
+                                request.getEmail()));
+
+        // Step 5: Send welcome email
+        emailService.sendWelcomeEmail(
+                request.getEmail(),
+                user.getName()
+        );
+
+        return ApiResponse.success(
+                "Email verified successfully! " +
+                        "You can now login to AppVerse AI."
+        );
+    }
+
+    // =============================================
+    // RESEND OTP
+    // =============================================
+
+    /**
+     * Resends a fresh OTP to user email.
+     * Invalidates all previous OTPs first.
+     * Used when previous OTP expired.
+     * @param email - user email
+     * @return success message with masked email
+     */
+    @Override
+    @Transactional
+    public ApiResponse<String> resendOtp(String email) {
+
+        log.info("Resend OTP request for: {}", email);
+
+        // Step 1: Check user exists
+        User user = userRepository
+                .findByEmail(email)
+                .orElseThrow(() ->
+                        new UserNotFoundException(email));
+
+        // Step 2: Check not already verified
+        if (user.isVerified()) {
+            return ApiResponse.success(
+                    "Account already verified. " +
+                            "Please login.");
+        }
+
+        // Step 3: Invalidate previous OTPs
+        otpVerificationRepository
+                .markAllOtpsAsUsed(email);
+
+        // Step 4: Generate fresh OTP
+        String otp = generateAndSaveOtp(
+                email,
+                OtpVerification.OtpType.REGISTRATION
+        );
+
+        // Step 5: Send new OTP email
+        emailService.sendRegistrationOtp(
+                email, otp, user.getName());
+
+        log.info("New OTP sent to: {}", email);
+
+        return ApiResponse.success(
+                "New OTP sent to " +
+                        otpUtil.maskEmail(email) +
+                        ". Valid for " +
+                        otpExpiryMinutes + " minutes."
+        );
+    }
+
+    // =============================================
+    // LOGIN
+    // =============================================
+
+    /**
+     * Authenticates user and returns JWT token.
+     * Checks account verified before auth.
+     * Uses Spring Security AuthenticationManager.
+     * @param request - email and password
+     * @return AuthResponse with JWT token
+     */
+    @Override
+    public AuthResponse login(LoginRequest request) {
+
+        log.info("Login attempt for: {}",
+                request.getEmail());
+
+        // Step 1: Check user exists
+        User user = userRepository
+                .findByEmail(request.getEmail())
+                .orElseThrow(() -> {
+                    log.warn("Login failed - " +
+                                    "user not found: {}",
+                            request.getEmail());
+                    return new InvalidCredentialsException();
+                });
+
+        // Step 2: Check account verified
+        if (!user.isVerified()) {
+            log.warn("Login failed - " +
+                            "account not verified: {}",
+                    request.getEmail());
+            throw new AccountNotVerifiedException(
+                    request.getEmail());
+        }
+
+        // Step 3: Check account active
+        if (!user.isActive()) {
+            log.warn("Login failed - " +
+                            "account inactive: {}",
+                    request.getEmail());
+            throw new InvalidCredentialsException(
+                    "Account is deactivated. " +
+                            "Contact support.");
+        }
+
+        try {
+            // Step 4: Authenticate with Spring Security
+            // This verifies the password with BCrypt
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.getEmail(),
+                            request.getPassword()
+                    )
+            );
+
+        } catch (BadCredentialsException e) {
+            log.warn("Login failed - " +
+                            "bad credentials: {}",
+                    request.getEmail());
+            throw new InvalidCredentialsException();
+        }
+
+        // Step 5: Load UserDetails for JWT
+        UserDetails userDetails =
+                org.springframework.security.core
+                        .userdetails.User
+                        .builder()
+                        .username(user.getEmail())
+                        .password(user.getPassword())
+                        .authorities("ROLE_" +
+                                user.getRole().name())
+                        .build();
+
+        // Step 6: Generate JWT token
+        String jwtToken = jwtUtil.generateToken(
+                userDetails,
+                user.getId(),
+                user.getRole().name()
+        );
+
+        log.info("Login successful for: {}",
+                request.getEmail());
+
+        // Step 7: Build and return auth response
+        return AuthResponse.builder()
+                .token(jwtToken)
+                .tokenType("Bearer")
+                .expiresIn(jwtUtil.getExpirationTime())
+                .userId(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .role(user.getRole())
+                .build();
+    }
+
+    // =============================================
+    // FORGOT PASSWORD
+    // =============================================
+
+    /**
+     * Sends password reset OTP to Gmail.
+     * First step of forgot password flow.
+     * @param request - email address
+     * @return success message with masked email
+     */
+    @Override
+    @Transactional
+    public ApiResponse<String> forgotPassword(
+            ForgotPasswordRequest request) {
+
+        log.info("Forgot password request for: {}",
+                request.getEmail());
+
+        // Step 1: Check user exists
+        User user = userRepository
+                .findByEmail(request.getEmail())
+                .orElseThrow(() ->
+                        new UserNotFoundException(
+                                request.getEmail()));
+
+        // Step 2: Invalidate previous OTPs
+        otpVerificationRepository
+                .markAllOtpsAsUsed(request.getEmail());
+
+        // Step 3: Generate reset OTP
+        String otp = generateAndSaveOtp(
+                request.getEmail(),
+                OtpVerification.OtpType.PASSWORD_RESET
+        );
+
+        // Step 4: Send reset OTP email
+        emailService.sendPasswordResetOtp(
+                request.getEmail(),
+                otp,
+                user.getName()
+        );
+
+        log.info("Password reset OTP sent to: {}",
+                request.getEmail());
+
+        return ApiResponse.success(
+                "Password reset OTP sent to " +
+                        otpUtil.maskEmail(
+                                request.getEmail()) +
+                        ". Valid for " +
+                        otpExpiryMinutes + " minutes."
+        );
+    }
+
+    // =============================================
+    // RESET PASSWORD
+    // =============================================
+
+    /**
+     * Resets password after OTP verification.
+     * Validates OTP then updates hashed password.
+     * @param request - email, otp, new password
+     * @return success message
+     */
+    @Override
+    @Transactional
+    public ApiResponse<String> resetPassword(
+            ResetPasswordRequest request) {
+
+        log.info("Password reset attempt for: {}",
+                request.getEmail());
+
+        // Step 1: Validate passwords match
+        if (!request.getNewPassword()
+                .equals(request.getConfirmPassword())) {
+            throw new InvalidCredentialsException(
+                    "Passwords do not match.");
+        }
+
+        // Step 2: Validate OTP
+        OtpVerification otpVerification =
+                validateOtp(
+                        request.getEmail(),
+                        request.getOtp(),
+                        OtpVerification.OtpType
+                                .PASSWORD_RESET
+                );
+
+        // Step 3: Mark OTP as used
+        otpVerification.setUsed(true);
+        otpVerificationRepository.save(otpVerification);
+
+        // Step 4: Hash and update new password
+        String hashedPassword = passwordEncoder
+                .encode(request.getNewPassword());
+
+        userRepository.updatePasswordByEmail(
+                request.getEmail(),
+                hashedPassword
+        );
+
+        log.info("Password reset successful for: {}",
+                request.getEmail());
+
+        return ApiResponse.success(
+                "Password reset successful! " +
+                        "Please login with your new password."
+        );
+    }
+
+    // =============================================
+    // PRIVATE HELPER METHODS
+    // =============================================
+
+    /**
+     * Generates OTP, saves to DB with expiry.
+     * Used by both registration and password reset.
+     * @param email - recipient email
+     * @param otpType - REGISTRATION or PASSWORD_RESET
+     * @return generated OTP string
+     */
+    private String generateAndSaveOtp(
+            String email,
+            OtpVerification.OtpType otpType) {
+
+        // Generate secure 6-digit OTP
+        String otp = otpUtil.generateOtp();
+
+        // Build OTP entity with expiry
+        OtpVerification otpVerification =
+                OtpVerification.builder()
+                        .email(email)
+                        .otp(otp)
+                        .otpType(otpType)
+                        .isUsed(false)
+                        // Expire after configured minutes
+                        .expiresAt(LocalDateTime.now()
+                                .plusMinutes(otpExpiryMinutes))
+                        .build();
+
+        // Save to database
+        otpVerificationRepository.save(otpVerification);
+
+        log.debug("OTP generated and saved for: {}",
+                email);
+
+        return otp;
+    }
+
+    /**
+     * Validates OTP from database.
+     * Checks existence, expiry, and used status.
+     * Throws appropriate exceptions on failure.
+     * @param email - user email
+     * @param otp - OTP code to validate
+     * @param otpType - type of OTP
+     * @return valid OtpVerification entity
+     */
+    private OtpVerification validateOtp(
+            String email,
+            String otp,
+            OtpVerification.OtpType otpType) {
+
+        // Find latest unused OTP for email and type
+        OtpVerification otpVerification =
+                otpVerificationRepository
+                        .findLatestUnusedOtp(
+                                email, otpType)
+                        .orElseThrow(() ->
+                                new InvalidOtpException(
+                                        "No active OTP found. " +
+                                                "Please request a new OTP."
+                                ));
+
+        // Check if OTP has expired
+        if (otpVerification.isExpired()) {
+            log.warn("OTP expired for: {}", email);
+            throw new OtpExpiredException();
+        }
+
+        // Check if OTP code matches
+        if (!otpVerification.getOtp().equals(otp)) {
+            log.warn("Invalid OTP entered for: {}",
+                    email);
+            throw new InvalidOtpException();
+        }
+
+        // Check if already used
+        if (otpVerification.isUsed()) {
+            log.warn("OTP already used for: {}", email);
+            throw new InvalidOtpException(
+                    "OTP already used. " +
+                            "Please request a new OTP.");
+        }
+
+        return otpVerification;
+    }
+}
+
+Step 3: AuthController.java
+Package: com.appverse.ai.controller
+javapackage com.appverse.ai.controller;
+
+import com.appverse.ai.dto.request.ForgotPasswordRequest;
+import com.appverse.ai.dto.request.LoginRequest;
+import com.appverse.ai.dto.request.RegisterRequest;
+import com.appverse.ai.dto.request.ResetPasswordRequest;
+import com.appverse.ai.dto.request.VerifyOtpRequest;
+import com.appverse.ai.dto.response.ApiResponse;
+import com.appverse.ai.dto.response.AuthResponse;
+import com.appverse.ai.service.AuthService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+/**
+ * REST Controller for Authentication endpoints.
+ * Handles all auth flows:
+ * - Registration with OTP verification
+ * - Login with JWT
+ * - Forgot/Reset password with OTP
+ *
+ * Base URL: /api/auth
+ * All endpoints are PUBLIC (no JWT required)
+ */
+@RestController
+@RequestMapping("/api/auth")
+@RequiredArgsConstructor
+@Slf4j
+@Tag(
+        name = "Authentication",
+        description = "Endpoints for user registration, " +
+                "login, OTP verification, " +
+                "and password reset"
+)
+public class AuthController {
+
+    /**
+     * Auth service for business logic
+     */
+    private final AuthService authService;
+
+    // =============================================
+    // REGISTER
+    // =============================================
+
+    /**
+     * Registers a new user account.
+     * Sends OTP to provided Gmail address.
+     * POST /api/auth/register
+     *
+     * @param request - name, email, password, role
+     * @return 201 Created with success message
+     */
+    @PostMapping("/register")
+    @Operation(
+            summary = "Register new user",
+            description = "Creates new account and " +
+                    "sends OTP to Gmail for verification"
+    )
+    public ResponseEntity<ApiResponse<String>> register(
+            @Valid @RequestBody RegisterRequest request) {
+
+        log.info("POST /api/auth/register - {}",
+                request.getEmail());
+
+        ApiResponse<String> response =
+                authService.register(request);
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(response);
+    }
+
+    // =============================================
+    // VERIFY REGISTRATION OTP
+    // =============================================
+
+    /**
+     * Verifies OTP sent during registration.
+     * Activates account on successful verification.
+     * POST /api/auth/verify-otp
+     *
+     * @param request - email and 6-digit OTP
+     * @return 200 OK with success message
+     */
+    @PostMapping("/verify-otp")
+    @Operation(
+            summary = "Verify registration OTP",
+            description = "Verifies the OTP sent to " +
+                    "Gmail and activates user account"
+    )
+    public ResponseEntity<ApiResponse<String>>
+    verifyRegistrationOtp(
+            @Valid @RequestBody VerifyOtpRequest request) {
+
+        log.info("POST /api/auth/verify-otp - {}",
+                request.getEmail());
+
+        ApiResponse<String> response =
+                authService.verifyRegistrationOtp(request);
+
+        return ResponseEntity.ok(response);
+    }
+
+    // =============================================
+    // RESEND OTP
+    // =============================================
+
+    /**
+     * Resends a fresh OTP to user Gmail.
+     * Used when previous OTP expired.
+     * POST /api/auth/resend-otp
+     *
+     * @param email - registered email address
+     * @return 200 OK with success message
+     */
+    @PostMapping("/resend-otp")
+    @Operation(
+            summary = "Resend OTP",
+            description = "Sends a new OTP to Gmail " +
+                    "invalidating the previous one"
+    )
+    public ResponseEntity<ApiResponse<String>> resendOtp(
+            @RequestParam String email) {
+
+        log.info("POST /api/auth/resend-otp - {}",
+                email);
+
+        ApiResponse<String> response =
+                authService.resendOtp(email);
+
+        return ResponseEntity.ok(response);
+    }
+
+    // =============================================
+    // LOGIN
+    // =============================================
+
+    /**
+     * Authenticates user and returns JWT token.
+     * Account must be verified before login.
+     * POST /api/auth/login
+     *
+     * @param request - email and password
+     * @return 200 OK with JWT token and user info
+     */
+    @PostMapping("/login")
+    @Operation(
+            summary = "User login",
+            description = "Authenticates user and " +
+                    "returns JWT Bearer token"
+    )
+    public ResponseEntity<ApiResponse<AuthResponse>>
+    login(
+            @Valid @RequestBody LoginRequest request) {
+
+        log.info("POST /api/auth/login - {}",
+                request.getEmail());
+
+        AuthResponse authResponse =
+                authService.login(request);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "Login successful!",
+                        authResponse
+                )
+        );
+    }
+
+    // =============================================
+    // FORGOT PASSWORD
+    // =============================================
+
+    /**
+     * Sends password reset OTP to Gmail.
+     * First step of forgot password flow.
+     * POST /api/auth/forgot-password
+     *
+     * @param request - registered email address
+     * @return 200 OK with success message
+     */
+    @PostMapping("/forgot-password")
+    @Operation(
+            summary = "Forgot password",
+            description = "Sends password reset OTP " +
+                    "to registered Gmail address"
+    )
+    public ResponseEntity<ApiResponse<String>>
+    forgotPassword(
+            @Valid @RequestBody
+            ForgotPasswordRequest request) {
+
+        log.info(
+                "POST /api/auth/forgot-password - {}",
+                request.getEmail());
+
+        ApiResponse<String> response =
+                authService.forgotPassword(request);
+
+        return ResponseEntity.ok(response);
+    }
+
+    // =============================================
+    // RESET PASSWORD
+    // =============================================
+
+    /**
+     * Resets password after OTP verification.
+     * Final step of forgot password flow.
+     * POST /api/auth/reset-password
+     *
+     * @param request - email, otp, new password
+     * @return 200 OK with success message
+     */
+    @PostMapping("/reset-password")
+    @Operation(
+            summary = "Reset password",
+            description = "Resets password after " +
+                    "verifying the OTP from Gmail"
+    )
+    public ResponseEntity<ApiResponse<String>>
+    resetPassword(
+            @Valid @RequestBody
+            ResetPasswordRequest request) {
+
+        log.info(
+                "POST /api/auth/reset-password - {}",
+                request.getEmail());
+
+        ApiResponse<String> response =
+                authService.resetPassword(request);
+
+        return ResponseEntity.ok(response);
+    }
+
+    // =============================================
+    // HEALTH CHECK
+    // =============================================
+
+    /**
+     * Simple health check for auth service.
+     * GET /api/auth/health
+     *
+     * @return 200 OK with status message
+     */
+    @GetMapping("/health")
+    @Operation(
+            summary = "Auth service health check",
+            description = "Checks if auth " +
+                    "service is running"
+    )
+    public ResponseEntity<ApiResponse<String>>
+    healthCheck() {
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "AppVerse AI Auth Service " +
+                                "is running!"
+                )
+        );
+    }
+}
+
+Complete Auth API Endpoints
+POST /api/auth/register
+     Body: { name, email, password, role }
+     Response: 201 + "OTP sent to g*****a@gmail.com"
+
+POST /api/auth/verify-otp
+     Body: { email, otp }
+     Response: 200 + "Account activated!"
+
+POST /api/auth/resend-otp?email=xxx@gmail.com
+     Response: 200 + "New OTP sent"
+
+POST /api/auth/login
+     Body: { email, password }
+     Response: 200 + { token, userId, name, role }
+
+POST /api/auth/forgot-password
+     Body: { email }
+     Response: 200 + "Reset OTP sent"
+
+POST /api/auth/reset-password
+     Body: { email, otp, newPassword, confirmPassword }
+     Response: 200 + "Password reset successful"
+
+GET  /api/auth/health
+     Response: 200 + "Auth Service is running!"
+
+Complete Auth Flow Diagram
+REGISTER FLOW:
+──────────────
+POST /register
+      ↓
+Check duplicate email
+      ↓
+Hash password (BCrypt)
+      ↓
+Save User (isVerified=false)
+      ↓
+Generate 6-digit OTP
+      ↓
+Save OTP (expires in 5 mins)
+      ↓
+Send OTP to Gmail (Async)
+      ↓
+Return masked email response
+
+POST /verify-otp
+      ↓
+Find latest unused OTP
+      ↓
+Check not expired
+      ↓
+Check OTP matches
+      ↓
+Mark OTP as used
+      ↓
+Set isVerified=true
+      ↓
+Send Welcome Email (Async)
+      ↓
+Return success
+
+LOGIN FLOW:
+───────────
+POST /login
+      ↓
+Find user by email
+      ↓
+Check isVerified=true
+      ↓
+Check isActive=true
+      ↓
+AuthManager verifies BCrypt
+      ↓
+Generate JWT (email+userId+role)
+      ↓
+Return token + user info
+
+FORGOT PASSWORD FLOW:
+─────────────────────
+POST /forgot-password
+      ↓
+Find user by email
+      ↓
+Invalidate old OTPs
+      ↓
+Generate new OTP
+      ↓
+Send Reset OTP to Gmail
+      ↓
+Return masked email
+
+POST /reset-password
+      ↓
+Validate passwords match
+      ↓
+Validate OTP
+      ↓
+Mark OTP as used
+      ↓
+Hash new password
+      ↓
+Update in database
+      ↓
+Return success
+
+Phase 2 Step 7 Complete ✅
+✅ AuthService interface - 6 methods
+✅ AuthServiceImpl - full implementation
+✅ AuthController - 7 REST endpoints
+✅ Register → OTP → Verify → Login flow
+✅ Forgot Password → OTP → Reset flow
+✅ Resend OTP support
+✅ BCrypt password hashing
+✅ JWT token generation on login
+✅ Email masking in responses
+✅ @Transactional on write operations
+✅ @Async email sending
+✅ Swagger @Operation annotations
+✅ Logging on every method
+✅ Comments on every class and method
+✅ Package: com.appverse.ai

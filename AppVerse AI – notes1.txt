@@ -1,0 +1,6135 @@
+AppVerse AI – Full Project Breakdown
+What This Project Is
+An AI-powered App Marketplace (think a mini Google Play Store) where:
+
+Users browse, search, review, and download apps
+Developers publish apps, track analytics, manage versions
+Admins moderate content and oversee the platform
+AI powers recommendations, sentiment analysis, and fake review detection
+
+
+Tech Stack You Need
+Frontend (React)
+ToolPurposeReact + HooksUI components, state managementReact RouterPage navigation, protected routesAxiosAPI calls to Spring Boot backendContext API / ReduxAuth state, user role managementResponsive CSS / TailwindMobile-friendly UI
+Backend (Spring Boot)
+ToolPurposeSpring BootREST API serverSpring Security + JWTLogin, role-based access (User/Admin/Developer)Spring Data JPADatabase operationsDTO PatternClean data transfer between layersSwagger/OpenAPIAPI documentationGlobal Exception HandlerCentralized error responses
+Database (MySQL or PostgreSQL)
+NeedExampleTables with relationshipsUser → Reviews → AppsQuery optimizationIndexed searches, filtered queries
+AI Integration (Mandatory — pick at least one, but this project needs two)
+ModuleWhat to UseRecommendation EngineGemini API or simple collaborative filteringSentiment AnalysisGemini API / OpenAI to analyze review text
+
+The 6 Modules Explained Simply
+Module 1 – Authentication & User Roles
+Three roles: User, Developer, Admin
+
+JWT login/signup
+Protected routes per role (Developer sees console, Admin sees dashboard, etc.)
+
+Module 2 – App Marketplace
+The main browsing page:
+
+List all apps with category filters (Games, Tools, Productivity…)
+Search bar
+Each app has ratings & reviews
+
+Module 3 – AI Recommendation Engine
+When a user views an app:
+
+"You might also like…" suggestions (similar apps)
+Trending apps section
+Personalized suggestions based on what they've downloaded/viewed
+Implement using Gemini API — send user history, get back recommendations
+
+Module 4 – Developer Console
+Only visible to Developer role:
+
+Upload a new app (name, description, category, version, file/link)
+Manage existing apps (update version, add release notes)
+View download counts and analytics charts
+
+Module 5 – AI Sentiment Analysis
+When a user posts a review:
+
+Send review text to Gemini/OpenAI API
+Get back: Positive / Negative / Neutral label
+Flag suspicious reviews (fake review detection)
+Predict what rating the review sentiment implies
+
+Module 6 – Analytics Dashboard
+Admin/Developer view:
+
+Charts: total downloads over time, revenue, user engagement
+Use Recharts or Chart.js on the React side
+
+
+Screens You Need to Build
+ScreenWho Sees ItApp ListingAll usersApp DetailsAll usersReview DashboardUsers + AdminAI RecommendationsLogged-in usersDeveloper AnalyticsDeveloper roleAdmin DashboardAdmin role
+
+How the Marks Are Distributed (Where to Focus)
+AreaMarksPriorityREST API Design15🔴 HighestReact UI/UX10🟠 HighReact Routing & Hooks10🟠 HighAI Recommendation Engine10🟠 HighReview Sentiment Analysis10🟠 HighJWT & Role Management10🟠 HighDatabase Design10🟠 HighDeveloper Console10🟠 HighFrontend-Backend Integration10🟠 HighException Handling5🟡 MediumDeployment & Documentation5🟡 Medium
+
+Suggested Build Order
+
+Database design — define all tables first (User, App, Review, Download, Category)
+Spring Boot backend — Auth → App CRUD → Review APIs → Analytics endpoints
+JWT + Security — protect endpoints by role
+Gemini API integration — Sentiment analysis first (simpler), then Recommendations
+React frontend — build screen by screen, connect with Axios
+Swagger docs + Exception handling — polish at the end
+
+
+Want me to start with the database schema, the Spring Boot project structure, or the React folder structure? I can build any of these out fully for you.You said: Tell me step by step how can I do the point number 1 in the build orderTell me step by step how can I do the point number 1 in the build order12:32 PMClaude responded: Step-by-Step: Database Design for AppVerse AIStep-by-Step: Database Design for AppVerse AI
+Step 1: Identify Your Entities
+Based on the project, you need these tables:
+TableRepresentsusersAll users (User/Developer/Admin)appsApplications listed on marketplacecategoriesApp categories (Games, Tools, etc.)reviewsUser reviews on appsdownloadsTrack who downloaded whatapp_versionsVersion history of each app
+
+Step 2: Define Relationships
+users ──────< reviews >────── apps
+users ──────< downloads >──── apps
+users ──────< apps (developer uploads)
+apps ────── category
+apps ──────< app_versions
+
+One User → Many Reviews
+One User → Many Downloads
+One Developer (User) → Many Apps
+One App → Many Reviews
+One App → Many Versions
+One Category → Many Apps
+
+
+Step 3: Design Each Table
+users
+sqlCREATE TABLE users (
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    name        VARCHAR(100) NOT NULL,
+    email       VARCHAR(150) UNIQUE NOT NULL,
+    password    VARCHAR(255) NOT NULL,
+    role        ENUM('USER', 'DEVELOPER', 'ADMIN') NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+categories
+sqlCREATE TABLE categories (
+    id    BIGINT PRIMARY KEY AUTO_INCREMENT,
+    name  VARCHAR(100) UNIQUE NOT NULL
+);
+apps
+sqlCREATE TABLE apps (
+    id              BIGINT PRIMARY KEY AUTO_INCREMENT,
+    name            VARCHAR(150) NOT NULL,
+    description     TEXT,
+    category_id     BIGINT,
+    developer_id    BIGINT,
+    version         VARCHAR(20),
+    download_count  INT DEFAULT 0,
+    avg_rating      DOUBLE DEFAULT 0.0,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (category_id) REFERENCES categories(id),
+    FOREIGN KEY (developer_id) REFERENCES users(id)
+);
+reviews
+sqlCREATE TABLE reviews (
+    id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+    app_id        BIGINT NOT NULL,
+    user_id       BIGINT NOT NULL,
+    rating        INT CHECK (rating BETWEEN 1 AND 5),
+    comment       TEXT,
+    sentiment     ENUM('POSITIVE', 'NEGATIVE', 'NEUTRAL'),
+    is_fake       BOOLEAN DEFAULT FALSE,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (app_id) REFERENCES apps(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+downloads
+sqlCREATE TABLE downloads (
+    id           BIGINT PRIMARY KEY AUTO_INCREMENT,
+    app_id       BIGINT NOT NULL,
+    user_id      BIGINT NOT NULL,
+    downloaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (app_id) REFERENCES apps(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+app_versions
+sqlCREATE TABLE app_versions (
+    id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+    app_id        BIGINT NOT NULL,
+    version       VARCHAR(20) NOT NULL,
+    release_notes TEXT,
+    released_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (app_id) REFERENCES apps(id)
+);
+
+Step 4: Add Indexes for Query Optimization
+sql-- Speed up searching apps by category
+CREATE INDEX idx_apps_category ON apps(category_id);
+
+-- Speed up fetching reviews per app
+CREATE INDEX idx_reviews_app ON reviews(app_id);
+
+-- Speed up download history per user
+CREATE INDEX idx_downloads_user ON downloads(user_id);
+
+-- Speed up developer's apps list
+CREATE INDEX idx_apps_developer ON apps(developer_id);
+
+Step 5: Create the MySQL Database
+Open MySQL Workbench or your terminal and run:
+sqlCREATE DATABASE appverse_db;
+USE appverse_db;
+-- then paste all the CREATE TABLE statements above
+
+Step 6: Configure Spring Boot to Connect
+In your application.properties:
+propertiesspring.datasource.url=jdbc:mysql://localhost:3306/appverse_db
+spring.datasource.username=root
+spring.datasource.password=your_password
+
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQL8Dialect
+
+Step 7: Verify Your Design Mentally
+Ask yourself these questions ✅
+
+Can I find all apps by a developer? → Yes, via developer_id in apps
+Can I find all reviews for an app? → Yes, via app_id in reviews
+Can I track who downloaded what? → Yes, via downloads table
+Can I store AI sentiment result? → Yes, sentiment column in reviews
+Can I show version history? → Yes, via app_versions table
+
+
+What's Next (Step 2 in Build Order)
+Once your database is ready, the next step is creating your Spring Boot project structure with:
+
+Entity classes mapping to these tables
+Repository interfaces
+Service layer
+Controller layer
+
+Want me to walk you through that next?You said: Now keep in my this requirementsNow keep in my this requirements 
+Go through the above image I have provided and
+I want design patterns implementation 
+I want unit testing for service files
+I want validations and mappings 
+Also want comments in each file 
+And also for frontend i want a welcome page where I have something about the app and a login and register buttons which navigates me to respective login and register pages 
+I want frontend with a constant theme for all pages 
+Try your best and provide me the implementation 
+Can you do that ? Just tell me yes or no12:37 PMClaude responded: Yes, I can do that!Yes, I can do that! ✅
+Here's what I'll cover fully:
+Backend:
+
+Proper package structure & naming conventions
+Layered Architecture (Controller → Service → Repository)
+Entity classes with JPA mappings
+DTO classes with validations (@NotNull, @Email, etc.)
+Service interfaces + implementation classes
+RestControllers with REST MVC
+GlobalException handling + CustomExceptions
+Lombok, Swagger-UI
+Logging in each file
+JWT authentication
+Unit tests for service classes
+Design patterns (Builder, Singleton, Strategy)
+Comments in every file
+
+Frontend:
+
+Welcome/Landing page with app intro + Login & Register buttons
+Login page & Register page
+Constant theme across all pages (consistent navbar, colors, fonts)
+React Router navigation
+Protected routes by role
+Axios service layer
+
+
+Just confirm one thing before I start — which database are you using, MySQL or PostgreSQL? And do you want me to start with the full backend first or both backend and frontend together?You said: For database i want to use spring data jpa and hybernateFor database i want to use spring data jpa and hybernate
+And I'm using mysql12:38 PM2 / 2Claude responded: Perfect!Perfect! ✅
+Just to confirm the full plan before I start coding everything:
+Backend Tech:
+
+Spring Boot + Spring Data JPA + Hibernate + MySQL
+Spring Security + JWT
+Lombok + Swagger + Logging
+Global Exception Handling + Custom Exceptions
+DTO + Validations + MapStruct/manual mapping
+Design Patterns (Builder, Singleton, Strategy)
+JUnit + Mockito unit tests
+
+Frontend Tech:
+
+React + React Router
+Context API for auth state
+Axios
+Consistent theme (I'll use a clean blue/white theme)
+Welcome → Login → Register → Role-based dashboards
+
+
+One last quick question before I generate everything:
+What is your Spring Boot project name?
+For example:
+
+appverse-backend
+appverse-ai
+AppVerseAI
+
+This affects your package name like:
+
+com.appverse.backend
+Tell me the name and I'll start generating the complete full implementation file by file! 🚀You said: You decide anything for project nameYou decide anything for project name 
+and I want security jwt in a professional level like I want to get otp to gmail like how we get in real time 
+Can you do it ?12:40 PMClaude responded: Yes, I can do that!Yes, I can do that! ✅
+Here's what I'll add for Professional JWT + OTP via Gmail:
+Security Flow:
+
+User registers → gets OTP to Gmail
+User verifies OTP → account activated
+User logs in → gets JWT token
+JWT used for all protected routes
+Forgot password → OTP to Gmail → reset password
+OTP expires in 5 minutes (like real apps)
+
+Tech needed for Gmail OTP:
+
+JavaMailSender (Spring Mail)
+Gmail SMTP config
+OTP generated randomly (6 digits)
+OTP stored temporarily with expiry time
+
+
+Before I start, I need 2 quick things from you:
+1. Do you have a Gmail account to use for sending OTPs?
+
+(You'll need to enable 2-step verification + generate an App Password from Google — I'll guide you through that too)
+2. Your MySQL details — just confirm:
+
+Database name you want: appverse_db ✅ or something else?
+MySQL username: root?
+
+Once you confirm these I'll start generating everything file by file! 🚀You said: I have my personal gmail accountI have my personal gmail account 
+appverse_db is fine 
+User name is root 
+For now u give me the way how  to implement the project from scratch like order of implementation12:43 PMClaude responded: Complete Implementation Order for AppVerse AIComplete Implementation Order for AppVerse AI
+Phase 1: Spring Boot Project Setup
+1. Create Spring Boot project (Spring Initializr)
+2. Add all dependencies in pom.xml
+3. Configure application.properties
+4. Set up MySQL database
+Phase 2: Backend Implementation Order
+STEP 1 → Entity Classes
+         ↓
+STEP 2 → Repository Interfaces
+         ↓
+STEP 3 → Custom Exceptions + Global Exception Handler
+         ↓
+STEP 4 → DTOs + Validations
+         ↓
+STEP 5 → Email Service (Gmail OTP Setup)
+         ↓
+STEP 6 → JWT Utility + Security Config
+         ↓
+STEP 7 → Auth Service + Auth Controller
+         (Register → OTP → Verify → Login)
+         ↓
+STEP 8 → Category Service + Controller
+         ↓
+STEP 9 → App Service + Controller
+         ↓
+STEP 10 → Review Service + Controller
+          ↓
+STEP 11 → Download Service + Controller
+          ↓
+STEP 12 → AI Service (Gemini API)
+          (Sentiment Analysis + Recommendations)
+          ↓
+STEP 13 → Analytics Service + Controller
+          ↓
+STEP 14 → Swagger Configuration
+          ↓
+STEP 15 → Unit Tests (JUnit + Mockito)
+Phase 3: Frontend Implementation Order
+STEP 1 → React Project Setup + Theme Setup
+         ↓
+STEP 2 → Folder Structure + Axios Config
+         ↓
+STEP 3 → Welcome/Landing Page
+         ↓
+STEP 4 → Register Page + OTP Verify Page
+         ↓
+STEP 5 → Login Page
+         ↓
+STEP 6 → Context API (Auth State)
+         ↓
+STEP 7 → Protected Routes Setup
+         ↓
+STEP 8 → User Dashboard
+         (Browse Apps, Search, Filter)
+         ↓
+STEP 9 → App Details Page + Reviews
+         ↓
+STEP 10 → AI Recommendations Page
+          ↓
+STEP 11 → Developer Console
+          (Upload App, Analytics)
+          ↓
+STEP 12 → Admin Dashboard
+          ↓
+STEP 13 → Connect All Axios API Calls
+Phase 4: Final Steps
+STEP 1 → Test all APIs in Postman
+STEP 2 → Test Frontend-Backend Integration
+STEP 3 → Swagger Documentation
+STEP 4 → README file for GitHub
+
+Visual Flow
+MySQL DB
+   ↑
+Entities (JPA/Hibernate)
+   ↑
+Repositories
+   ↑
+Services (Business Logic + AI)
+   ↑
+Controllers (REST APIs)
+   ↑
+Security (JWT + OTP)
+   ↑
+React Frontend (Axios calls)
+
+Dependency Map (pom.xml needs)
+DependencyPurposespring-boot-starter-webREST APIsspring-boot-starter-data-jpaJPA + Hibernatemysql-connector-jMySQL connectionspring-boot-starter-securitySecurityjjwtJWT tokensspring-boot-starter-mailGmail OTPspring-boot-starter-validationDTO validationslombokReduce boilerplatespringdoc-openapiSwagger UIjunit + mockitoUnit testing
+
+Which Step Do You Want First?
+Tell me which phase/step to start and I'll give you the complete code for it:
+
+"Start Phase 1" → Project setup + pom.xml + application.properties
+"Start Phase 2 Step 1" → All Entity classes
+"Start from beginning" → I'll go one by one automatically
+
+Which one? 🚀You said: Start phase 1Start phase 112:43 PMClaude responded: Phase 1: Spring Boot Project SetupPhase 1: Spring Boot Project Setup
+Step 1: Create Project via Spring Initializr
+Go to https://start.spring.io and set:
+Project     : Maven
+Language    : Java
+Spring Boot : 3.2.5
+Packaging   : Jar
+Java        : 17
+Group & Artifact:
+Group    : com.appverse
+Artifact : appverse-backend
+Name     : appverse-backend
+Package  : com.appverse.backend
+Add these Dependencies by searching:
+✅ Spring Web
+✅ Spring Data JPA
+✅ Spring Security
+✅ MySQL Driver
+✅ Validation
+✅ Spring Boot DevTools
+✅ Lombok
+✅ Java Mail Sender
+Click Generate → Extract the ZIP → Open in STS
+
+Step 2: Add Remaining Dependencies in pom.xml
+Open pom.xml and replace everything with this:
+xml<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.5</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.appverse</groupId>
+    <artifactId>appverse-backend</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>appverse-backend</name>
+    <description>AppVerse AI - Smart App Marketplace</description>
+
+    <properties>
+        <java.version>17</java.version>
+    </properties>
+
+    <dependencies>
+
+        <!-- Spring Web - REST APIs -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- Spring Data JPA + Hibernate -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+
+        <!-- Spring Security -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!-- MySQL Driver -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Validation -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- Java Mail Sender - Gmail OTP -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
+        <!-- Lombok - Reduce Boilerplate -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- DevTools - Auto Restart -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- JWT - Token Generation -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.11.5</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>0.11.5</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>0.11.5</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Swagger / OpenAPI -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.3.0</version>
+        </dependency>
+
+        <!-- JUnit + Mockito - Unit Testing -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
+
+Step 3: Create Folder Structure
+Inside src/main/java/com/appverse/backend/ create these packages:
+com.appverse.backend
+│
+├── config/          → Security, Swagger, Mail configs
+├── controller/      → REST Controllers
+├── dto/             → Request & Response DTOs
+│   ├── request/
+│   └── response/
+├── entity/          → JPA Entity classes
+├── exception/       → Custom exceptions
+│   └── handler/     → Global exception handler
+├── repository/      → JPA Repositories
+├── security/        → JWT utility, filters
+├── service/         → Service interfaces
+│   └── impl/        → Service implementations
+└── util/            → Helper/Utility classes
+To create in STS:
+
+Right click com.appverse.backend → New → Package
+Type each package name above
+
+
+Step 4: application.properties
+Open src/main/resources/application.properties and paste:
+properties# ===========================
+# APPLICATION CONFIG
+# ===========================
+spring.application.name=appverse-backend
+server.port=8080
+
+# ===========================
+# MYSQL DATABASE CONFIG
+# ===========================
+spring.datasource.url=jdbc:mysql://localhost:3306/appverse_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC
+spring.datasource.username=root
+spring.datasource.password=YOUR_MYSQL_PASSWORD
+
+# ===========================
+# JPA / HIBERNATE CONFIG
+# ===========================
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQL8Dialect
+
+# ===========================
+# JWT CONFIG
+# ===========================
+app.jwt.secret=appverse_super_secret_key_2024_do_not_share
+app.jwt.expiration=86400000
+
+# ===========================
+# OTP CONFIG
+# ===========================
+app.otp.expiry.minutes=5
+
+# ===========================
+# GMAIL SMTP CONFIG
+# ===========================
+spring.mail.host=smtp.gmail.com
+spring.mail.port=587
+spring.mail.username=YOUR_GMAIL@gmail.com
+spring.mail.password=YOUR_GMAIL_APP_PASSWORD
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.starttls.enable=true
+spring.mail.properties.mail.smtp.starttls.required=true
+
+# ===========================
+# SWAGGER CONFIG
+# ===========================
+springdoc.api-docs.path=/api-docs
+springdoc.swagger-ui.path=/swagger-ui.html
+
+# ===========================
+# LOGGING CONFIG
+# ===========================
+logging.level.com.appverse=DEBUG
+logging.level.org.springframework.security=DEBUG
+logging.pattern.console=%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n
+
+Step 5: Gmail App Password Setup
+Follow these steps to get your Gmail App Password:
+1. Go to myaccount.google.com
+2. Click "Security" on left
+3. Enable "2-Step Verification"
+4. After enabling, search "App Passwords"
+5. Click App Passwords
+6. Select app: "Mail"
+7. Select device: "Windows Computer"
+8. Click Generate
+9. Copy the 16-digit password shown
+10. Paste it in application.properties
+    → spring.mail.password=xxxx xxxx xxxx xxxx
+
+Step 6: Main Application Class
+Open AppverseBackendApplication.java and replace with:
+javapackage com.appverse.backend;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
+
+/**
+ * Main entry point for AppVerse AI Backend Application
+ * EnableScheduling is used for OTP expiry cleanup tasks
+ */
+@SpringBootApplication
+@EnableScheduling
+public class AppverseBackendApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(AppverseBackendApplication.class, args);
+        System.out.println("===========================================");
+        System.out.println("  AppVerse AI Backend Started Successfully ");
+        System.out.println("  Swagger UI: http://localhost:8080/swagger-ui.html");
+        System.out.println("===========================================");
+    }
+}
+
+Step 7: Verify Setup
+After all the above:
+1. Right click project → Maven → Update Project
+2. Check MySQL is running
+3. Run AppverseBackendApplication.java
+4. You should see:
+   ✅ "AppVerse AI Backend Started Successfully"
+   ✅ No red errors in console
+   ✅ appverse_db created automatically in MySQL
+
+Phase 1 Complete ✅
+Phase 1 Checklist:
+✅ Spring Boot project created
+✅ All dependencies added in pom.xml
+✅ Folder structure created
+✅ application.properties configured
+✅ Gmail App Password setup
+✅ Main class configured
+✅ Project runs without errors
+
+Tell me "Start Phase 2 Step 1" and I'll give you all the Entity classes with full JPA mappings, Lombok, and comments! 🚀You said: Start phase 2 step 1Start phase 2 step 112:47 PMClaude responded: Phase 2 - Step 1: All Entity ClassesPhase 2 - Step 1: All Entity Classes
+Package: com.appverse.backend.entity
+
+Entity 1: User.java
+javapackage com.appverse.backend.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * Entity class representing a User in the AppVerse system.
+ * Supports three roles: USER, DEVELOPER, ADMIN
+ * Uses Lombok for boilerplate reduction
+ */
+@Entity
+@Table(name = "users")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    /**
+     * Full name of the user
+     */
+    @Column(name = "name", nullable = false, length = 100)
+    private String name;
+
+    /**
+     * Unique email used for login and OTP delivery
+     */
+    @Column(name = "email", nullable = false, unique = true, length = 150)
+    private String email;
+
+    /**
+     * BCrypt hashed password
+     */
+    @Column(name = "password", nullable = false)
+    private String password;
+
+    /**
+     * Role of the user - USER, DEVELOPER, or ADMIN
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false)
+    private Role role;
+
+    /**
+     * Whether the account is verified via OTP
+     */
+    @Column(name = "is_verified", nullable = false)
+    private boolean isVerified = false;
+
+    /**
+     * Whether the account is active
+     */
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
+
+    /**
+     * Timestamp when user was created
+     */
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    /**
+     * Timestamp when user was last updated
+     */
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    /**
+     * Apps uploaded by this user (if DEVELOPER role)
+     */
+    @OneToMany(mappedBy = "developer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<App> uploadedApps;
+
+    /**
+     * Reviews written by this user
+     */
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Review> reviews;
+
+    /**
+     * Downloads made by this user
+     */
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Download> downloads;
+
+    /**
+     * Enum defining user roles
+     */
+    public enum Role {
+        USER,
+        DEVELOPER,
+        ADMIN
+    }
+}
+
+Entity 2: OtpVerification.java
+javapackage com.appverse.backend.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.time.LocalDateTime;
+
+/**
+ * Entity class for storing OTP verification details.
+ * OTP expires after 5 minutes (configurable)
+ * Used for both registration and forgot password flows
+ */
+@Entity
+@Table(name = "otp_verifications")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class OtpVerification {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    /**
+     * Email to which OTP was sent
+     */
+    @Column(name = "email", nullable = false)
+    private String email;
+
+    /**
+     * 6-digit OTP code
+     */
+    @Column(name = "otp", nullable = false)
+    private String otp;
+
+    /**
+     * Type of OTP - REGISTRATION or PASSWORD_RESET
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "otp_type", nullable = false)
+    private OtpType otpType;
+
+    /**
+     * Whether OTP has been used already
+     */
+    @Column(name = "is_used", nullable = false)
+    private boolean isUsed = false;
+
+    /**
+     * When the OTP expires
+     */
+    @Column(name = "expires_at", nullable = false)
+    private LocalDateTime expiresAt;
+
+    /**
+     * When the OTP was created
+     */
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    /**
+     * OTP purpose types
+     */
+    public enum OtpType {
+        REGISTRATION,
+        PASSWORD_RESET
+    }
+
+    /**
+     * Check if OTP is expired
+     * @return true if expired
+     */
+    public boolean isExpired() {
+        return LocalDateTime.now().isAfter(this.expiresAt);
+    }
+}
+
+Entity 3: Category.java
+javapackage com.appverse.backend.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * Entity class representing an App Category.
+ * Examples: Games, Tools, Productivity, Education, etc.
+ */
+@Entity
+@Table(name = "categories")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Category {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    /**
+     * Unique category name
+     */
+    @Column(name = "name", nullable = false, unique = true, length = 100)
+    private String name;
+
+    /**
+     * Description of the category
+     */
+    @Column(name = "description", length = 255)
+    private String description;
+
+    /**
+     * Icon URL for the category
+     */
+    @Column(name = "icon_url")
+    private String iconUrl;
+
+    /**
+     * Whether category is active
+     */
+    @Column(name = "is_active")
+    private boolean isActive = true;
+
+    /**
+     * Timestamp when category was created
+     */
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    /**
+     * List of apps under this category
+     */
+    @OneToMany(mappedBy = "category", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<App> apps;
+}
+
+Entity 4: App.java
+javapackage com.appverse.backend.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * Entity class representing an Application on the marketplace.
+ * Uploaded by DEVELOPER role users.
+ * Contains all app metadata, ratings, and relationships.
+ */
+@Entity
+@Table(name = "apps", indexes = {
+        @Index(name = "idx_apps_category", columnList = "category_id"),
+        @Index(name = "idx_apps_developer", columnList = "developer_id")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class App {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    /**
+     * Name of the application
+     */
+    @Column(name = "name", nullable = false, length = 150)
+    private String name;
+
+    /**
+     * Detailed description of the app
+     */
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
+    /**
+     * Current version of the app
+     */
+    @Column(name = "version", length = 20)
+    private String version;
+
+    /**
+     * App icon URL
+     */
+    @Column(name = "icon_url")
+    private String iconUrl;
+
+    /**
+     * Download URL or file path
+     */
+    @Column(name = "download_url")
+    private String downloadUrl;
+
+    /**
+     * Total number of downloads
+     */
+    @Column(name = "download_count")
+    private Integer downloadCount = 0;
+
+    /**
+     * Average rating (1.0 to 5.0)
+     */
+    @Column(name = "avg_rating")
+    private Double avgRating = 0.0;
+
+    /**
+     * Total number of ratings received
+     */
+    @Column(name = "total_ratings")
+    private Integer totalRatings = 0;
+
+    /**
+     * App size in MB
+     */
+    @Column(name = "size_mb")
+    private Double sizeMb;
+
+    /**
+     * Status of the app
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private AppStatus status = AppStatus.PENDING;
+
+    /**
+     * Whether app is featured on homepage
+     */
+    @Column(name = "is_featured")
+    private boolean isFeatured = false;
+
+    /**
+     * Timestamp when app was created
+     */
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    /**
+     * Timestamp when app was last updated
+     */
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    /**
+     * Category this app belongs to
+     */
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "category_id", nullable = false)
+    private Category category;
+
+    /**
+     * Developer who uploaded this app
+     */
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "developer_id", nullable = false)
+    private User developer;
+
+    /**
+     * All reviews for this app
+     */
+    @OneToMany(mappedBy = "app", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Review> reviews;
+
+    /**
+     * All downloads of this app
+     */
+    @OneToMany(mappedBy = "app", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Download> downloads;
+
+    /**
+     * Version history of this app
+     */
+    @OneToMany(mappedBy = "app", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<AppVersion> versions;
+
+    /**
+     * App approval status
+     */
+    public enum AppStatus {
+        PENDING,    // Waiting for admin approval
+        APPROVED,   // Visible on marketplace
+        REJECTED,   // Rejected by admin
+        SUSPENDED   // Temporarily removed
+    }
+}
+
+Entity 5: AppVersion.java
+javapackage com.appverse.backend.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.time.LocalDateTime;
+
+/**
+ * Entity class representing a version history entry for an App.
+ * Tracks all version releases with release notes.
+ */
+@Entity
+@Table(name = "app_versions", indexes = {
+        @Index(name = "idx_versions_app", columnList = "app_id")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class AppVersion {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    /**
+     * Version number e.g. 1.0.0, 2.1.3
+     */
+    @Column(name = "version", nullable = false, length = 20)
+    private String version;
+
+    /**
+     * What changed in this version
+     */
+    @Column(name = "release_notes", columnDefinition = "TEXT")
+    private String releaseNotes;
+
+    /**
+     * Download URL for this specific version
+     */
+    @Column(name = "download_url")
+    private String downloadUrl;
+
+    /**
+     * File size in MB for this version
+     */
+    @Column(name = "size_mb")
+    private Double sizeMb;
+
+    /**
+     * When this version was released
+     */
+    @CreationTimestamp
+    @Column(name = "released_at", updatable = false)
+    private LocalDateTime releasedAt;
+
+    /**
+     * The app this version belongs to
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "app_id", nullable = false)
+    private App app;
+}
+
+Entity 6: Review.java
+javapackage com.appverse.backend.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.time.LocalDateTime;
+
+/**
+ * Entity class representing a User Review on an App.
+ * Includes AI sentiment analysis results.
+ * Tracks fake review detection status.
+ */
+@Entity
+@Table(name = "reviews", indexes = {
+        @Index(name = "idx_reviews_app", columnList = "app_id"),
+        @Index(name = "idx_reviews_user", columnList = "user_id")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Review {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    /**
+     * Rating given by user (1 to 5)
+     */
+    @Column(name = "rating", nullable = false)
+    private Integer rating;
+
+    /**
+     * Review comment text
+     */
+    @Column(name = "comment", columnDefinition = "TEXT")
+    private String comment;
+
+    /**
+     * AI-analyzed sentiment of the review
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sentiment")
+    private Sentiment sentiment;
+
+    /**
+     * AI confidence score for sentiment (0.0 to 1.0)
+     */
+    @Column(name = "sentiment_score")
+    private Double sentimentScore;
+
+    /**
+     * Whether AI flagged this as a fake review
+     */
+    @Column(name = "is_fake")
+    private boolean isFake = false;
+
+    /**
+     * Whether review is approved to show publicly
+     */
+    @Column(name = "is_approved")
+    private boolean isApproved = true;
+
+    /**
+     * Timestamp when review was created
+     */
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    /**
+     * Timestamp when review was last updated
+     */
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    /**
+     * The app being reviewed
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "app_id", nullable = false)
+    private App app;
+
+    /**
+     * The user who wrote the review
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    /**
+     * Sentiment types from AI analysis
+     */
+    public enum Sentiment {
+        POSITIVE,
+        NEGATIVE,
+        NEUTRAL
+    }
+}
+
+Entity 7: Download.java
+javapackage com.appverse.backend.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.time.LocalDateTime;
+
+/**
+ * Entity class representing a Download record.
+ * Tracks which user downloaded which app and when.
+ * Used for analytics and recommendation engine.
+ */
+@Entity
+@Table(name = "downloads", indexes = {
+        @Index(name = "idx_downloads_user", columnList = "user_id"),
+        @Index(name = "idx_downloads_app", columnList = "app_id")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Download {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    /**
+     * Timestamp of the download
+     */
+    @CreationTimestamp
+    @Column(name = "downloaded_at", updatable = false)
+    private LocalDateTime downloadedAt;
+
+    /**
+     * IP address of downloader (for analytics)
+     */
+    @Column(name = "ip_address", length = 50)
+    private String ipAddress;
+
+    /**
+     * The app that was downloaded
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "app_id", nullable = false)
+    private App app;
+
+    /**
+     * The user who downloaded the app
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+}
+
+Phase 2 Step 1 Complete ✅
+Checklist:
+✅ User entity (with Role enum)
+✅ OtpVerification entity (with expiry check)
+✅ Category entity
+✅ App entity (with AppStatus enum + indexes)
+✅ AppVersion entity
+✅ Review entity (with Sentiment enum)
+✅ Download entity
+✅ All relationships mapped correctly
+✅ All indexes added for query optimization
+✅ Lombok annotations on all entities
+✅ Comments on every field
+
+Tell me "Start Phase 2 Step 2" and I'll generate all Repository Interfaces! 🚀You said: Start phase 2 step 2Start phase 2 step 212:50 PMClaude responded: Phase 2 - Step 2: All Repository InterfacesPhase 2 - Step 2: All Repository Interfaces
+Package: com.appverse.backend.repository
+
+Repository 1: UserRepository.java
+javapackage com.appverse.backend.repository;
+
+import com.appverse.backend.entity.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Repository interface for User entity.
+ * Provides CRUD operations and custom queries
+ * for user management and authentication.
+ */
+@Repository
+public interface UserRepository extends JpaRepository<User, Long> {
+
+    /**
+     * Find user by email address
+     * Used during login and OTP verification
+     * @param email - user email
+     * @return Optional<User>
+     */
+    Optional<User> findByEmail(String email);
+
+    /**
+     * Check if email already exists
+     * Used during registration validation
+     * @param email - user email
+     * @return true if exists
+     */
+    boolean existsByEmail(String email);
+
+    /**
+     * Find all users by role
+     * Used by admin to list developers or users
+     * @param role - USER, DEVELOPER, ADMIN
+     * @return List of users
+     */
+    List<User> findByRole(User.Role role);
+
+    /**
+     * Find all verified users
+     * @param isVerified - verification status
+     * @return List of users
+     */
+    List<User> findByIsVerified(boolean isVerified);
+
+    /**
+     * Find user by email and role
+     * Used to verify developer accounts
+     * @param email - user email
+     * @param role - user role
+     * @return Optional<User>
+     */
+    Optional<User> findByEmailAndRole(String email, User.Role role);
+
+    /**
+     * Update user verification status
+     * Called after successful OTP verification
+     * @param email - user email
+     */
+    @Modifying
+    @Query("UPDATE User u SET u.isVerified = true WHERE u.email = :email")
+    void verifyUserByEmail(@Param("email") String email);
+
+    /**
+     * Update user password
+     * Called after successful password reset
+     * @param email - user email
+     * @param password - new hashed password
+     */
+    @Modifying
+    @Query("UPDATE User u SET u.password = :password WHERE u.email = :email")
+    void updatePasswordByEmail(
+            @Param("email") String email,
+            @Param("password") String password
+    );
+
+    /**
+     * Count users by role
+     * Used for admin dashboard statistics
+     * @param role - user role
+     * @return count of users
+     */
+    long countByRole(User.Role role);
+
+    /**
+     * Find all active users
+     * @param isActive - active status
+     * @return List of active users
+     */
+    List<User> findByIsActive(boolean isActive);
+
+    /**
+     * Search users by name (case insensitive)
+     * Used by admin for user search
+     * @param name - search keyword
+     * @return List of matching users
+     */
+    @Query("SELECT u FROM User u WHERE LOWER(u.name) LIKE LOWER(CONCAT('%', :name, '%'))")
+    List<User> searchByName(@Param("name") String name);
+}
+
+Repository 2: OtpVerificationRepository.java
+javapackage com.appverse.backend.repository;
+
+import com.appverse.backend.entity.OtpVerification;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Repository interface for OtpVerification entity.
+ * Handles OTP storage, lookup, and cleanup operations.
+ * Used for both registration and password reset flows.
+ */
+@Repository
+public interface OtpVerificationRepository
+        extends JpaRepository<OtpVerification, Long> {
+
+    /**
+     * Find the latest unused OTP for an email and type
+     * Used during OTP verification step
+     * @param email - user email
+     * @param otpType - REGISTRATION or PASSWORD_RESET
+     * @return Optional<OtpVerification>
+     */
+    @Query("""
+            SELECT o FROM OtpVerification o
+            WHERE o.email = :email
+            AND o.otpType = :otpType
+            AND o.isUsed = false
+            ORDER BY o.createdAt DESC
+            LIMIT 1
+            """)
+    Optional<OtpVerification> findLatestUnusedOtp(
+            @Param("email") String email,
+            @Param("otpType") OtpVerification.OtpType otpType
+    );
+
+    /**
+     * Find OTP by email, otp code and type
+     * Used for direct OTP validation
+     * @param email - user email
+     * @param otp - the OTP code
+     * @param otpType - type of OTP
+     * @return Optional<OtpVerification>
+     */
+    Optional<OtpVerification> findByEmailAndOtpAndOtpType(
+            String email,
+            String otp,
+            OtpVerification.OtpType otpType
+    );
+
+    /**
+     * Mark all OTPs for an email as used
+     * Called after successful OTP verification
+     * @param email - user email
+     */
+    @Modifying
+    @Query("UPDATE OtpVerification o SET o.isUsed = true WHERE o.email = :email")
+    void markAllOtpsAsUsed(@Param("email") String email);
+
+    /**
+     * Delete all expired OTPs
+     * Called by scheduled cleanup task
+     * @param now - current timestamp
+     */
+    @Modifying
+    @Query("DELETE FROM OtpVerification o WHERE o.expiresAt < :now")
+    void deleteExpiredOtps(@Param("now") LocalDateTime now);
+
+    /**
+     * Delete all OTPs for a specific email
+     * Called when user account is deleted
+     * @param email - user email
+     */
+    void deleteByEmail(String email);
+
+    /**
+     * Find all expired and unused OTPs
+     * Used for monitoring/reporting
+     * @param now - current timestamp
+     * @return List of expired OTPs
+     */
+    @Query("""
+            SELECT o FROM OtpVerification o
+            WHERE o.expiresAt < :now
+            AND o.isUsed = false
+            """)
+    List<OtpVerification> findAllExpiredUnusedOtps(
+            @Param("now") LocalDateTime now
+    );
+}
+
+Repository 3: CategoryRepository.java
+javapackage com.appverse.backend.repository;
+
+import com.appverse.backend.entity.Category;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Repository interface for Category entity.
+ * Provides category lookup and search operations.
+ */
+@Repository
+public interface CategoryRepository extends JpaRepository<Category, Long> {
+
+    /**
+     * Find category by name (case insensitive)
+     * @param name - category name
+     * @return Optional<Category>
+     */
+    Optional<Category> findByNameIgnoreCase(String name);
+
+    /**
+     * Check if category name already exists
+     * Used during category creation validation
+     * @param name - category name
+     * @return true if exists
+     */
+    boolean existsByNameIgnoreCase(String name);
+
+    /**
+     * Find all active categories
+     * Used to display categories on frontend
+     * @param isActive - active status
+     * @return List of active categories
+     */
+    List<Category> findByIsActive(boolean isActive);
+
+    /**
+     * Find categories with app count
+     * Used for analytics dashboard
+     * @return List of category name and app count
+     */
+    @Query("""
+            SELECT c.name, COUNT(a.id)
+            FROM Category c
+            LEFT JOIN c.apps a
+            WHERE c.isActive = true
+            GROUP BY c.id, c.name
+            ORDER BY COUNT(a.id) DESC
+            """)
+    List<Object[]> findCategoriesWithAppCount();
+
+    /**
+     * Search categories by name keyword
+     * @param keyword - search keyword
+     * @return List of matching categories
+     */
+    @Query("""
+            SELECT c FROM Category c
+            WHERE LOWER(c.name)
+            LIKE LOWER(CONCAT('%', :keyword, '%'))
+            AND c.isActive = true
+            """)
+    List<Category> searchByKeyword(@Param("keyword") String keyword);
+}
+
+Repository 4: AppRepository.java
+javapackage com.appverse.backend.repository;
+
+import com.appverse.backend.entity.App;
+import com.appverse.backend.entity.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+/**
+ * Repository interface for App entity.
+ * Provides marketplace browsing, search,
+ * filtering, and analytics queries.
+ */
+@Repository
+public interface AppRepository extends JpaRepository<App, Long> {
+
+    /**
+     * Find all approved apps with pagination
+     * Used for marketplace listing
+     * @param status - app status
+     * @param pageable - pagination info
+     * @return Page of apps
+     */
+    Page<App> findByStatus(App.AppStatus status, Pageable pageable);
+
+    /**
+     * Find apps by category and status
+     * Used for category filtering
+     * @param categoryId - category id
+     * @param status - app status
+     * @param pageable - pagination
+     * @return Page of apps
+     */
+    @Query("""
+            SELECT a FROM App a
+            WHERE a.category.id = :categoryId
+            AND a.status = :status
+            """)
+    Page<App> findByCategoryAndStatus(
+            @Param("categoryId") Long categoryId,
+            @Param("status") App.AppStatus status,
+            Pageable pageable
+    );
+
+    /**
+     * Search apps by name or description
+     * Used for search functionality
+     * @param keyword - search keyword
+     * @param status - app status
+     * @param pageable - pagination
+     * @return Page of matching apps
+     */
+    @Query("""
+            SELECT a FROM App a
+            WHERE (LOWER(a.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            OR LOWER(a.description) LIKE LOWER(CONCAT('%', :keyword, '%')))
+            AND a.status = :status
+            """)
+    Page<App> searchApps(
+            @Param("keyword") String keyword,
+            @Param("status") App.AppStatus status,
+            Pageable pageable
+    );
+
+    /**
+     * Find all apps by a specific developer
+     * Used for developer console
+     * @param developer - developer user
+     * @return List of apps
+     */
+    List<App> findByDeveloper(User developer);
+
+    /**
+     * Find featured apps
+     * Used for homepage featured section
+     * @param isFeatured - featured flag
+     * @param status - app status
+     * @return List of featured apps
+     */
+    List<App> findByIsFeaturedAndStatus(
+            boolean isFeatured,
+            App.AppStatus status
+    );
+
+    /**
+     * Find top rated apps
+     * Used for recommendations
+     * @param status - app status
+     * @param pageable - pagination
+     * @return Page of top rated apps
+     */
+    @Query("""
+            SELECT a FROM App a
+            WHERE a.status = :status
+            ORDER BY a.avgRating DESC, a.downloadCount DESC
+            """)
+    Page<App> findTopRatedApps(
+            @Param("status") App.AppStatus status,
+            Pageable pageable
+    );
+
+    /**
+     * Find trending apps by download count
+     * Used for trending section
+     * @param status - app status
+     * @param pageable - pagination
+     * @return Page of trending apps
+     */
+    @Query("""
+            SELECT a FROM App a
+            WHERE a.status = :status
+            ORDER BY a.downloadCount DESC
+            """)
+    Page<App> findTrendingApps(
+            @Param("status") App.AppStatus status,
+            Pageable pageable
+    );
+
+    /**
+     * Find similar apps in same category
+     * Used for AI recommendation support
+     * @param categoryId - category id
+     * @param excludeAppId - app to exclude
+     * @param status - app status
+     * @param pageable - pagination
+     * @return Page of similar apps
+     */
+    @Query("""
+            SELECT a FROM App a
+            WHERE a.category.id = :categoryId
+            AND a.id != :excludeAppId
+            AND a.status = :status
+            ORDER BY a.avgRating DESC
+            """)
+    Page<App> findSimilarApps(
+            @Param("categoryId") Long categoryId,
+            @Param("excludeAppId") Long excludeAppId,
+            @Param("status") App.AppStatus status,
+            Pageable pageable
+    );
+
+    /**
+     * Increment download count for an app
+     * Called when user downloads an app
+     * @param appId - app id
+     */
+    @Modifying
+    @Query("""
+            UPDATE App a
+            SET a.downloadCount = a.downloadCount + 1
+            WHERE a.id = :appId
+            """)
+    void incrementDownloadCount(@Param("appId") Long appId);
+
+    /**
+     * Update average rating of an app
+     * Called after each new review
+     * @param appId - app id
+     * @param avgRating - new average rating
+     * @param totalRatings - new total ratings count
+     */
+    @Modifying
+    @Query("""
+            UPDATE App a
+            SET a.avgRating = :avgRating,
+            a.totalRatings = :totalRatings
+            WHERE a.id = :appId
+            """)
+    void updateAppRating(
+            @Param("appId") Long appId,
+            @Param("avgRating") Double avgRating,
+            @Param("totalRatings") Integer totalRatings
+    );
+
+    /**
+     * Count apps by status
+     * Used for admin dashboard
+     * @param status - app status
+     * @return count of apps
+     */
+    long countByStatus(App.AppStatus status);
+
+    /**
+     * Count apps by developer
+     * Used for developer analytics
+     * @param developer - developer user
+     * @return count of apps
+     */
+    long countByDeveloper(User developer);
+}
+
+Repository 5: AppVersionRepository.java
+javapackage com.appverse.backend.repository;
+
+import com.appverse.backend.entity.AppVersion;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Repository interface for AppVersion entity.
+ * Handles version history tracking for apps.
+ */
+@Repository
+public interface AppVersionRepository
+        extends JpaRepository<AppVersion, Long> {
+
+    /**
+     * Find all versions of an app ordered by release date
+     * Used for version history display
+     * @param appId - app id
+     * @return List of versions
+     */
+    @Query("""
+            SELECT v FROM AppVersion v
+            WHERE v.app.id = :appId
+            ORDER BY v.releasedAt DESC
+            """)
+    List<AppVersion> findAllByAppIdOrderByReleasedAtDesc(
+            @Param("appId") Long appId
+    );
+
+    /**
+     * Find latest version of an app
+     * Used to display current version
+     * @param appId - app id
+     * @return Optional<AppVersion>
+     */
+    @Query("""
+            SELECT v FROM AppVersion v
+            WHERE v.app.id = :appId
+            ORDER BY v.releasedAt DESC
+            LIMIT 1
+            """)
+    Optional<AppVersion> findLatestVersionByAppId(
+            @Param("appId") Long appId
+    );
+
+    /**
+     * Check if version already exists for an app
+     * Used during new version upload validation
+     * @param appId - app id
+     * @param version - version string
+     * @return true if exists
+     */
+    boolean existsByAppIdAndVersion(Long appId, String version);
+
+    /**
+     * Count total versions of an app
+     * @param appId - app id
+     * @return version count
+     */
+    long countByAppId(Long appId);
+}
+
+Repository 6: ReviewRepository.java
+javapackage com.appverse.backend.repository;
+
+import com.appverse.backend.entity.Review;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Repository interface for Review entity.
+ * Provides review queries including
+ * sentiment analysis and fake detection results.
+ */
+@Repository
+public interface ReviewRepository extends JpaRepository<Review, Long> {
+
+    /**
+     * Find all approved reviews for an app
+     * Used for app details page
+     * @param appId - app id
+     * @param isApproved - approval status
+     * @param pageable - pagination
+     * @return Page of reviews
+     */
+    Page<Review> findByAppIdAndIsApproved(
+            Long appId,
+            boolean isApproved,
+            Pageable pageable
+    );
+
+    /**
+     * Find all reviews by a user
+     * Used for user profile
+     * @param userId - user id
+     * @return List of reviews
+     */
+    List<Review> findByUserId(Long userId);
+
+    /**
+     * Check if user already reviewed an app
+     * Prevents duplicate reviews
+     * @param appId - app id
+     * @param userId - user id
+     * @return Optional<Review>
+     */
+    Optional<Review> findByAppIdAndUserId(Long appId, Long userId);
+
+    /**
+     * Find all fake reviews
+     * Used for admin moderation
+     * @param isFake - fake flag
+     * @param pageable - pagination
+     * @return Page of fake reviews
+     */
+    Page<Review> findByIsFake(boolean isFake, Pageable pageable);
+
+    /**
+     * Find reviews by sentiment
+     * Used for sentiment analytics
+     * @param appId - app id
+     * @param sentiment - sentiment type
+     * @return List of reviews
+     */
+    List<Review> findByAppIdAndSentiment(
+            Long appId,
+            Review.Sentiment sentiment
+    );
+
+    /**
+     * Calculate average rating for an app
+     * Used to update app rating after new review
+     * @param appId - app id
+     * @return average rating
+     */
+    @Query("""
+            SELECT AVG(r.rating)
+            FROM Review r
+            WHERE r.app.id = :appId
+            AND r.isApproved = true
+            AND r.isFake = false
+            """)
+    Double calculateAverageRating(@Param("appId") Long appId);
+
+    /**
+     * Count total ratings for an app
+     * @param appId - app id
+     * @return total rating count
+     */
+    @Query("""
+            SELECT COUNT(r)
+            FROM Review r
+            WHERE r.app.id = :appId
+            AND r.isApproved = true
+            AND r.isFake = false
+            """)
+    Integer countTotalRatings(@Param("appId") Long appId);
+
+    /**
+     * Get sentiment distribution for an app
+     * Used for analytics charts
+     * @param appId - app id
+     * @return List of sentiment and count
+     */
+    @Query("""
+            SELECT r.sentiment, COUNT(r)
+            FROM Review r
+            WHERE r.app.id = :appId
+            GROUP BY r.sentiment
+            """)
+    List<Object[]> getSentimentDistribution(
+            @Param("appId") Long appId
+    );
+
+    /**
+     * Find pending reviews (not approved)
+     * Used for admin moderation queue
+     * @param isApproved - approval status
+     * @param pageable - pagination
+     * @return Page of pending reviews
+     */
+    Page<Review> findByIsApproved(
+            boolean isApproved,
+            Pageable pageable
+    );
+}
+
+Repository 7: DownloadRepository.java
+javapackage com.appverse.backend.repository;
+
+import com.appverse.backend.entity.Download;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * Repository interface for Download entity.
+ * Provides download tracking and analytics queries.
+ * Used by recommendation engine and analytics dashboard.
+ */
+@Repository
+public interface DownloadRepository extends JpaRepository<Download, Long> {
+
+    /**
+     * Check if user already downloaded an app
+     * Prevents duplicate download records
+     * @param userId - user id
+     * @param appId - app id
+     * @return true if already downloaded
+     */
+    boolean existsByUserIdAndAppId(Long userId, Long appId);
+
+    /**
+     * Find all downloads by a user
+     * Used for recommendation engine input
+     * @param userId - user id
+     * @return List of downloads
+     */
+    List<Download> findByUserId(Long userId);
+
+    /**
+     * Find all downloads for an app
+     * Used for app analytics
+     * @param appId - app id
+     * @return List of downloads
+     */
+    List<Download> findByAppId(Long appId);
+
+    /**
+     * Count total downloads for an app
+     * Used for analytics dashboard
+     * @param appId - app id
+     * @return download count
+     */
+    long countByAppId(Long appId);
+
+    /**
+     * Count downloads for an app in a date range
+     * Used for time-based analytics
+     * @param appId - app id
+     * @param startDate - start date
+     * @param endDate - end date
+     * @return download count
+     */
+    @Query("""
+            SELECT COUNT(d) FROM Download d
+            WHERE d.app.id = :appId
+            AND d.downloadedAt BETWEEN :startDate AND :endDate
+            """)
+    long countDownloadsByAppAndDateRange(
+            @Param("appId") Long appId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate
+    );
+
+    /**
+     * Find most downloaded app IDs by a user
+     * Used for recommendation engine
+     * @param userId - user id
+     * @return List of app ids
+     */
+    @Query("""
+            SELECT d.app.id FROM Download d
+            WHERE d.user.id = :userId
+            ORDER BY d.downloadedAt DESC
+            """)
+    List<Long> findDownloadedAppIdsByUser(
+            @Param("userId") Long userId
+    );
+
+    /**
+     * Get daily download counts for analytics chart
+     * @param appId - app id
+     * @param startDate - start date
+     * @return List of date and count
+     */
+    @Query("""
+            SELECT DATE(d.downloadedAt), COUNT(d)
+            FROM Download d
+            WHERE d.app.id = :appId
+            AND d.downloadedAt >= :startDate
+            GROUP BY DATE(d.downloadedAt)
+            ORDER BY DATE(d.downloadedAt)
+            """)
+    List<Object[]> getDailyDownloadCounts(
+            @Param("appId") Long appId,
+            @Param("startDate") LocalDateTime startDate
+    );
+
+    /**
+     * Get total downloads per app for a developer
+     * Used for developer analytics dashboard
+     * @param developerId - developer user id
+     * @return List of app name and download count
+     */
+    @Query("""
+            SELECT a.name, COUNT(d)
+            FROM Download d
+            JOIN d.app a
+            WHERE a.developer.id = :developerId
+            GROUP BY a.id, a.name
+            ORDER BY COUNT(d) DESC
+            """)
+    List<Object[]> getDownloadCountPerAppByDeveloper(
+            @Param("developerId") Long developerId
+    );
+}
+
+Phase 2 Step 2 Complete ✅
+Checklist:
+✅ UserRepository - auth + admin queries
+✅ OtpVerificationRepository - OTP management
+✅ CategoryRepository - category browsing
+✅ AppRepository - marketplace + search + pagination
+✅ AppVersionRepository - version history
+✅ ReviewRepository - reviews + sentiment analytics
+✅ DownloadRepository - downloads + analytics
+✅ Custom JPQL queries in all repositories
+✅ Pagination support (Pageable)
+✅ Comments on every method
+✅ Indexes already set in entities
+
+Tell me "Start Phase 2 Step 3" and I'll generate Custom Exceptions + Global Exception Handler! 🚀You said: Start phase 2 step 3Start phase 2 step 312:52 PMClaude responded: Phase 2 - Step 3: Custom Exceptions + Global Exception HandlerPhase 2 - Step 3: Custom Exceptions + Global Exception Handler
+Package Structure
+exception/
+├── AppNotFoundException.java
+├── UserNotFoundException.java
+├── CategoryNotFoundException.java
+├── ReviewNotFoundException.java
+├── DuplicateEmailException.java
+├── InvalidOtpException.java
+├── OtpExpiredException.java
+├── UnauthorizedException.java
+├── AppNotApprovedException.java
+├── AlreadyReviewedException.java
+├── InvalidCredentialsException.java
+├── AccountNotVerifiedException.java
+├── DuplicateAppVersionException.java
+└── handler/
+    └── GlobalExceptionHandler.java
+
+Exception 1: AppNotFoundException.java
+javapackage com.appverse.backend.exception;
+
+/**
+ * Exception thrown when an App is not found
+ * in the database by given id or criteria.
+ * Maps to HTTP 404 Not Found response.
+ */
+public class AppNotFoundException extends RuntimeException {
+
+    /**
+     * Constructor with app id
+     * @param id - app id that was not found
+     */
+    public AppNotFoundException(Long id) {
+        super("App not found with id: " + id);
+    }
+
+    /**
+     * Constructor with custom message
+     * @param message - custom error message
+     */
+    public AppNotFoundException(String message) {
+        super(message);
+    }
+}
+
+Exception 2: UserNotFoundException.java
+javapackage com.appverse.backend.exception;
+
+/**
+ * Exception thrown when a User is not found
+ * in the database by given id or email.
+ * Maps to HTTP 404 Not Found response.
+ */
+public class UserNotFoundException extends RuntimeException {
+
+    /**
+     * Constructor with user id
+     * @param id - user id that was not found
+     */
+    public UserNotFoundException(Long id) {
+        super("User not found with id: " + id);
+    }
+
+    /**
+     * Constructor with email
+     * @param email - email that was not found
+     */
+    public UserNotFoundException(String email) {
+        super("User not found with email: " + email);
+    }
+}
+
+Exception 3: CategoryNotFoundException.java
+javapackage com.appverse.backend.exception;
+
+/**
+ * Exception thrown when a Category is not found
+ * in the database by given id or name.
+ * Maps to HTTP 404 Not Found response.
+ */
+public class CategoryNotFoundException extends RuntimeException {
+
+    /**
+     * Constructor with category id
+     * @param id - category id that was not found
+     */
+    public CategoryNotFoundException(Long id) {
+        super("Category not found with id: " + id);
+    }
+
+    /**
+     * Constructor with category name
+     * @param name - category name that was not found
+     */
+    public CategoryNotFoundException(String name) {
+        super("Category not found with name: " + name);
+    }
+}
+
+Exception 4: ReviewNotFoundException.java
+javapackage com.appverse.backend.exception;
+
+/**
+ * Exception thrown when a Review is not found
+ * in the database by given id.
+ * Maps to HTTP 404 Not Found response.
+ */
+public class ReviewNotFoundException extends RuntimeException {
+
+    /**
+     * Constructor with review id
+     * @param id - review id that was not found
+     */
+    public ReviewNotFoundException(Long id) {
+        super("Review not found with id: " + id);
+    }
+
+    /**
+     * Constructor with custom message
+     * @param message - custom error message
+     */
+    public ReviewNotFoundException(String message) {
+        super(message);
+    }
+}
+
+Exception 5: DuplicateEmailException.java
+javapackage com.appverse.backend.exception;
+
+/**
+ * Exception thrown when a user tries to register
+ * with an email that already exists in the system.
+ * Maps to HTTP 409 Conflict response.
+ */
+public class DuplicateEmailException extends RuntimeException {
+
+    /**
+     * Constructor with duplicate email
+     * @param email - email that already exists
+     */
+    public DuplicateEmailException(String email) {
+        super("Email already registered: " + email);
+    }
+}
+
+Exception 6: InvalidOtpException.java
+javapackage com.appverse.backend.exception;
+
+/**
+ * Exception thrown when user enters
+ * an incorrect or already used OTP.
+ * Maps to HTTP 400 Bad Request response.
+ */
+public class InvalidOtpException extends RuntimeException {
+
+    /**
+     * Default constructor with standard message
+     */
+    public InvalidOtpException() {
+        super("Invalid OTP entered. Please check and try again.");
+    }
+
+    /**
+     * Constructor with custom message
+     * @param message - custom error message
+     */
+    public InvalidOtpException(String message) {
+        super(message);
+    }
+}
+
+Exception 7: OtpExpiredException.java
+javapackage com.appverse.backend.exception;
+
+/**
+ * Exception thrown when user tries to verify
+ * an OTP that has already passed its expiry time.
+ * Maps to HTTP 400 Bad Request response.
+ */
+public class OtpExpiredException extends RuntimeException {
+
+    /**
+     * Default constructor with standard message
+     */
+    public OtpExpiredException() {
+        super("OTP has expired. Please request a new OTP.");
+    }
+
+    /**
+     * Constructor with custom message
+     * @param message - custom error message
+     */
+    public OtpExpiredException(String message) {
+        super(message);
+    }
+}
+
+Exception 8: UnauthorizedException.java
+javapackage com.appverse.backend.exception;
+
+/**
+ * Exception thrown when a user tries to access
+ * a resource they don't have permission for.
+ * Maps to HTTP 403 Forbidden response.
+ */
+public class UnauthorizedException extends RuntimeException {
+
+    /**
+     * Default constructor with standard message
+     */
+    public UnauthorizedException() {
+        super("You are not authorized to perform this action.");
+    }
+
+    /**
+     * Constructor with custom message
+     * @param message - custom error message
+     */
+    public UnauthorizedException(String message) {
+        super(message);
+    }
+}
+
+Exception 9: AppNotApprovedException.java
+javapackage com.appverse.backend.exception;
+
+/**
+ * Exception thrown when user tries to download
+ * or review an app that is not yet approved by admin.
+ * Maps to HTTP 400 Bad Request response.
+ */
+public class AppNotApprovedException extends RuntimeException {
+
+    /**
+     * Constructor with app id
+     * @param appId - id of unapproved app
+     */
+    public AppNotApprovedException(Long appId) {
+        super("App with id " + appId +
+                " is not approved for marketplace yet.");
+    }
+
+    /**
+     * Constructor with custom message
+     * @param message - custom error message
+     */
+    public AppNotApprovedException(String message) {
+        super(message);
+    }
+}
+
+Exception 10: AlreadyReviewedException.java
+javapackage com.appverse.backend.exception;
+
+/**
+ * Exception thrown when user tries to submit
+ * more than one review for the same app.
+ * Maps to HTTP 409 Conflict response.
+ */
+public class AlreadyReviewedException extends RuntimeException {
+
+    /**
+     * Default constructor with standard message
+     */
+    public AlreadyReviewedException() {
+        super("You have already reviewed this app.");
+    }
+
+    /**
+     * Constructor with app id and user id
+     * @param appId - app id
+     * @param userId - user id
+     */
+    public AlreadyReviewedException(Long appId, Long userId) {
+        super("User " + userId +
+                " has already reviewed app " + appId);
+    }
+}
+
+Exception 11: InvalidCredentialsException.java
+javapackage com.appverse.backend.exception;
+
+/**
+ * Exception thrown when user provides
+ * wrong email or password during login.
+ * Maps to HTTP 401 Unauthorized response.
+ */
+public class InvalidCredentialsException extends RuntimeException {
+
+    /**
+     * Default constructor with standard message
+     */
+    public InvalidCredentialsException() {
+        super("Invalid email or password. Please try again.");
+    }
+
+    /**
+     * Constructor with custom message
+     * @param message - custom error message
+     */
+    public InvalidCredentialsException(String message) {
+        super(message);
+    }
+}
+
+Exception 12: AccountNotVerifiedException.java
+javapackage com.appverse.backend.exception;
+
+/**
+ * Exception thrown when user tries to login
+ * without verifying their email via OTP first.
+ * Maps to HTTP 403 Forbidden response.
+ */
+public class AccountNotVerifiedException extends RuntimeException {
+
+    /**
+     * Default constructor with standard message
+     */
+    public AccountNotVerifiedException() {
+        super("Account not verified. " +
+                "Please verify your email with the OTP sent.");
+    }
+
+    /**
+     * Constructor with email
+     * @param email - unverified email
+     */
+    public AccountNotVerifiedException(String email) {
+        super("Account with email " + email +
+                " is not verified. Please check your inbox.");
+    }
+}
+
+Exception 13: DuplicateAppVersionException.java
+javapackage com.appverse.backend.exception;
+
+/**
+ * Exception thrown when developer tries to upload
+ * a version that already exists for an app.
+ * Maps to HTTP 409 Conflict response.
+ */
+public class DuplicateAppVersionException extends RuntimeException {
+
+    /**
+     * Constructor with version and app id
+     * @param version - duplicate version string
+     * @param appId - app id
+     */
+    public DuplicateAppVersionException(String version, Long appId) {
+        super("Version " + version +
+                " already exists for app with id: " + appId);
+    }
+}
+
+Handler: GlobalExceptionHandler.java
+javapackage com.appverse.backend.exception.handler;
+
+import com.appverse.backend.exception.*;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
+
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Global Exception Handler for the entire application.
+ * Catches all exceptions thrown from any controller
+ * and returns consistent, structured error responses.
+ * Uses @RestControllerAdvice to intercept all controllers.
+ */
+@RestControllerAdvice
+@Slf4j
+public class GlobalExceptionHandler {
+
+    // =============================================
+    // ERROR RESPONSE STRUCTURE
+    // =============================================
+
+    /**
+     * Builds a structured error response map
+     * @param status - HTTP status code
+     * @param message - error message
+     * @param request - web request info
+     * @return structured error map
+     */
+    private Map<String, Object> buildErrorResponse(
+            HttpStatus status,
+            String message,
+            WebRequest request) {
+
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("timestamp", LocalDateTime.now().toString());
+        errorResponse.put("status", status.value());
+        errorResponse.put("error", status.getReasonPhrase());
+        errorResponse.put("message", message);
+        errorResponse.put("path",
+                request.getDescription(false)
+                        .replace("uri=", ""));
+        return errorResponse;
+    }
+
+    // =============================================
+    // 404 - NOT FOUND EXCEPTIONS
+    // =============================================
+
+    /**
+     * Handles AppNotFoundException
+     * Thrown when app not found by id
+     */
+    @ExceptionHandler(AppNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleAppNotFoundException(
+            AppNotFoundException ex,
+            WebRequest request) {
+
+        log.error("App not found: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(buildErrorResponse(
+                        HttpStatus.NOT_FOUND,
+                        ex.getMessage(),
+                        request));
+    }
+
+    /**
+     * Handles UserNotFoundException
+     * Thrown when user not found by id or email
+     */
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleUserNotFoundException(
+            UserNotFoundException ex,
+            WebRequest request) {
+
+        log.error("User not found: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(buildErrorResponse(
+                        HttpStatus.NOT_FOUND,
+                        ex.getMessage(),
+                        request));
+    }
+
+    /**
+     * Handles CategoryNotFoundException
+     * Thrown when category not found
+     */
+    @ExceptionHandler(CategoryNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleCategoryNotFoundException(
+            CategoryNotFoundException ex,
+            WebRequest request) {
+
+        log.error("Category not found: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(buildErrorResponse(
+                        HttpStatus.NOT_FOUND,
+                        ex.getMessage(),
+                        request));
+    }
+
+    /**
+     * Handles ReviewNotFoundException
+     * Thrown when review not found
+     */
+    @ExceptionHandler(ReviewNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleReviewNotFoundException(
+            ReviewNotFoundException ex,
+            WebRequest request) {
+
+        log.error("Review not found: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(buildErrorResponse(
+                        HttpStatus.NOT_FOUND,
+                        ex.getMessage(),
+                        request));
+    }
+
+    // =============================================
+    // 409 - CONFLICT EXCEPTIONS
+    // =============================================
+
+    /**
+     * Handles DuplicateEmailException
+     * Thrown when email already registered
+     */
+    @ExceptionHandler(DuplicateEmailException.class)
+    public ResponseEntity<Map<String, Object>> handleDuplicateEmailException(
+            DuplicateEmailException ex,
+            WebRequest request) {
+
+        log.error("Duplicate email: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(buildErrorResponse(
+                        HttpStatus.CONFLICT,
+                        ex.getMessage(),
+                        request));
+    }
+
+    /**
+     * Handles AlreadyReviewedException
+     * Thrown when user reviews same app twice
+     */
+    @ExceptionHandler(AlreadyReviewedException.class)
+    public ResponseEntity<Map<String, Object>> handleAlreadyReviewedException(
+            AlreadyReviewedException ex,
+            WebRequest request) {
+
+        log.error("Already reviewed: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(buildErrorResponse(
+                        HttpStatus.CONFLICT,
+                        ex.getMessage(),
+                        request));
+    }
+
+    /**
+     * Handles DuplicateAppVersionException
+     * Thrown when version already exists
+     */
+    @ExceptionHandler(DuplicateAppVersionException.class)
+    public ResponseEntity<Map<String, Object>> handleDuplicateAppVersionException(
+            DuplicateAppVersionException ex,
+            WebRequest request) {
+
+        log.error("Duplicate app version: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(buildErrorResponse(
+                        HttpStatus.CONFLICT,
+                        ex.getMessage(),
+                        request));
+    }
+
+    // =============================================
+    // 400 - BAD REQUEST EXCEPTIONS
+    // =============================================
+
+    /**
+     * Handles InvalidOtpException
+     * Thrown when OTP is wrong or already used
+     */
+    @ExceptionHandler(InvalidOtpException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidOtpException(
+            InvalidOtpException ex,
+            WebRequest request) {
+
+        log.error("Invalid OTP: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(buildErrorResponse(
+                        HttpStatus.BAD_REQUEST,
+                        ex.getMessage(),
+                        request));
+    }
+
+    /**
+     * Handles OtpExpiredException
+     * Thrown when OTP has passed expiry time
+     */
+    @ExceptionHandler(OtpExpiredException.class)
+    public ResponseEntity<Map<String, Object>> handleOtpExpiredException(
+            OtpExpiredException ex,
+            WebRequest request) {
+
+        log.error("OTP expired: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(buildErrorResponse(
+                        HttpStatus.BAD_REQUEST,
+                        ex.getMessage(),
+                        request));
+    }
+
+    /**
+     * Handles AppNotApprovedException
+     * Thrown when app is not approved yet
+     */
+    @ExceptionHandler(AppNotApprovedException.class)
+    public ResponseEntity<Map<String, Object>> handleAppNotApprovedException(
+            AppNotApprovedException ex,
+            WebRequest request) {
+
+        log.error("App not approved: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(buildErrorResponse(
+                        HttpStatus.BAD_REQUEST,
+                        ex.getMessage(),
+                        request));
+    }
+
+    /**
+     * Handles MethodArgumentNotValidException
+     * Thrown when DTO validation fails (@Valid)
+     * Returns field-level validation errors
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, Object>> handleValidationException(
+            MethodArgumentNotValidException ex,
+            WebRequest request) {
+
+        log.error("Validation failed: {}", ex.getMessage());
+
+        // Collect all field errors
+        Map<String, String> fieldErrors = new HashMap<>();
+        ex.getBindingResult()
+                .getAllErrors()
+                .forEach(error -> {
+                    String fieldName =
+                            ((FieldError) error).getField();
+                    String errorMessage =
+                            error.getDefaultMessage();
+                    fieldErrors.put(fieldName, errorMessage);
+                });
+
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("timestamp",
+                LocalDateTime.now().toString());
+        errorResponse.put("status",
+                HttpStatus.BAD_REQUEST.value());
+        errorResponse.put("error", "Validation Failed");
+        errorResponse.put("message",
+                "Input validation failed");
+        errorResponse.put("fieldErrors", fieldErrors);
+        errorResponse.put("path",
+                request.getDescription(false)
+                        .replace("uri=", ""));
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(errorResponse);
+    }
+
+    // =============================================
+    // 401 - UNAUTHORIZED EXCEPTIONS
+    // =============================================
+
+    /**
+     * Handles InvalidCredentialsException
+     * Thrown when login credentials are wrong
+     */
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidCredentialsException(
+            InvalidCredentialsException ex,
+            WebRequest request) {
+
+        log.error("Invalid credentials: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(buildErrorResponse(
+                        HttpStatus.UNAUTHORIZED,
+                        ex.getMessage(),
+                        request));
+    }
+
+    /**
+     * Handles Spring Security BadCredentialsException
+     * Thrown by Spring Security during authentication
+     */
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<Map<String, Object>> handleBadCredentialsException(
+            BadCredentialsException ex,
+            WebRequest request) {
+
+        log.error("Bad credentials: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(buildErrorResponse(
+                        HttpStatus.UNAUTHORIZED,
+                        "Invalid email or password.",
+                        request));
+    }
+
+    // =============================================
+    // 403 - FORBIDDEN EXCEPTIONS
+    // =============================================
+
+    /**
+     * Handles UnauthorizedException
+     * Thrown when user lacks permission
+     */
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<Map<String, Object>> handleUnauthorizedException(
+            UnauthorizedException ex,
+            WebRequest request) {
+
+        log.error("Unauthorized access: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(buildErrorResponse(
+                        HttpStatus.FORBIDDEN,
+                        ex.getMessage(),
+                        request));
+    }
+
+    /**
+     * Handles AccountNotVerifiedException
+     * Thrown when unverified user tries to login
+     */
+    @ExceptionHandler(AccountNotVerifiedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccountNotVerifiedException(
+            AccountNotVerifiedException ex,
+            WebRequest request) {
+
+        log.error("Account not verified: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(buildErrorResponse(
+                        HttpStatus.FORBIDDEN,
+                        ex.getMessage(),
+                        request));
+    }
+
+    /**
+     * Handles Spring Security AccessDeniedException
+     * Thrown when role-based access is denied
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccessDeniedException(
+            AccessDeniedException ex,
+            WebRequest request) {
+
+        log.error("Access denied: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(buildErrorResponse(
+                        HttpStatus.FORBIDDEN,
+                        "Access denied. " +
+                        "You don't have permission for this.",
+                        request));
+    }
+
+    // =============================================
+    // 500 - INTERNAL SERVER ERROR
+    // =============================================
+
+    /**
+     * Handles all other unexpected exceptions
+     * Acts as a catch-all safety net
+     */
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleGlobalException(
+            Exception ex,
+            WebRequest request) {
+
+        log.error("Unexpected error occurred: {}",
+                ex.getMessage(), ex);
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(buildErrorResponse(
+                        HttpStatus.INTERNAL_SERVER_ERROR,
+                        "An unexpected error occurred. " +
+                        "Please try again later.",
+                        request));
+    }
+}
+
+Sample Error Responses
+404 - App Not Found:
+json{
+  "timestamp": "2024-01-15T10:30:00",
+  "status": 404,
+  "error": "Not Found",
+  "message": "App not found with id: 5",
+  "path": "/api/apps/5"
+}
+400 - Validation Failed:
+json{
+  "timestamp": "2024-01-15T10:30:00",
+  "status": 400,
+  "error": "Validation Failed",
+  "message": "Input validation failed",
+  "fieldErrors": {
+    "email": "must be a valid email",
+    "password": "must be at least 8 characters"
+  },
+  "path": "/api/auth/register"
+}
+400 - OTP Expired:
+json{
+  "timestamp": "2024-01-15T10:30:00",
+  "status": 400,
+  "error": "Bad Request",
+  "message": "OTP has expired. Please request a new OTP.",
+  "path": "/api/auth/verify-otp"
+}
+
+Phase 2 Step 3 Complete ✅
+✅ 13 Custom Exception classes
+✅ GlobalExceptionHandler with @RestControllerAdvice
+✅ Structured error response for every exception
+✅ Field-level validation error messages
+✅ Logging in every handler with @Slf4j
+✅ HTTP status codes correctly mapped
+✅ Comments on every class and method
+✅ Spring Security exceptions handled
+✅ Catch-all 500 handler as safety net
+
+Tell me "Start Phase 2 Step 4" and I'll generate all DTOs with Validations! 🚀You said: Start phase 2 step 4Start phase 2 step 412:53 PMClaude responded: Phase 2 - Step 4: DTOs with ValidationsPhase 2 - Step 4: DTOs with Validations
+Package Structure
+dto/
+├── request/
+│   ├── RegisterRequest.java
+│   ├── VerifyOtpRequest.java
+│   ├── LoginRequest.java
+│   ├── ForgotPasswordRequest.java
+│   ├── ResetPasswordRequest.java
+│   ├── CategoryRequest.java
+│   ├── AppRequest.java
+│   ├── AppVersionRequest.java
+│   └── ReviewRequest.java
+└── response/
+    ├── AuthResponse.java
+    ├── UserResponse.java
+    ├── CategoryResponse.java
+    ├── AppResponse.java
+    ├── AppVersionResponse.java
+    ├── ReviewResponse.java
+    ├── DownloadResponse.java
+    ├── ApiResponse.java
+    └── PageResponse.java
+
+REQUEST DTOs
+
+Request 1: RegisterRequest.java
+javapackage com.appverse.backend.dto.request;
+
+import com.appverse.backend.entity.User;
+import jakarta.validation.constraints.*;
+import lombok.*;
+
+/**
+ * DTO for user registration request.
+ * Contains all fields required to create
+ * a new user account in the system.
+ * Validated before processing.
+ */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class RegisterRequest {
+
+    /**
+     * Full name of the user
+     * Must not be blank, 2-100 characters
+     */
+    @NotBlank(message = "Name is required")
+    @Size(min = 2, max = 100,
+            message = "Name must be between 2 and 100 characters")
+    private String name;
+
+    /**
+     * Email address - used for login and OTP
+     * Must be valid email format
+     */
+    @NotBlank(message = "Email is required")
+    @Email(message = "Please provide a valid email address")
+    private String email;
+
+    /**
+     * Password - must meet security requirements
+     * Min 8 chars, must have uppercase,
+     * lowercase, digit and special character
+     */
+    @NotBlank(message = "Password is required")
+    @Size(min = 8,
+            message = "Password must be at least 8 characters")
+    @Pattern(
+            regexp = "^(?=.*[a-z])(?=.*[A-Z])" +
+                    "(?=.*\\d)(?=.*[@$!%*?&])" +
+                    "[A-Za-z\\d@$!%*?&]{8,}$",
+            message = "Password must contain at least one " +
+                    "uppercase, lowercase, digit " +
+                    "and special character"
+    )
+    private String password;
+
+    /**
+     * Role of the user
+     * Must be USER or DEVELOPER (not ADMIN)
+     */
+    @NotNull(message = "Role is required")
+    private User.Role role;
+}
+
+Request 2: VerifyOtpRequest.java
+javapackage com.appverse.backend.dto.request;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import lombok.*;
+
+/**
+ * DTO for OTP verification request.
+ * Used for both registration verification
+ * and password reset OTP confirmation.
+ */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class VerifyOtpRequest {
+
+    /**
+     * Email address the OTP was sent to
+     */
+    @NotBlank(message = "Email is required")
+    @Email(message = "Please provide a valid email address")
+    private String email;
+
+    /**
+     * 6-digit OTP code entered by user
+     */
+    @NotBlank(message = "OTP is required")
+    @Pattern(
+            regexp = "^[0-9]{6}$",
+            message = "OTP must be exactly 6 digits"
+    )
+    private String otp;
+}
+
+Request 3: LoginRequest.java
+javapackage com.appverse.backend.dto.request;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import lombok.*;
+
+/**
+ * DTO for user login request.
+ * Contains credentials for authentication.
+ * Returns JWT token on success.
+ */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class LoginRequest {
+
+    /**
+     * Registered email address
+     */
+    @NotBlank(message = "Email is required")
+    @Email(message = "Please provide a valid email address")
+    private String email;
+
+    /**
+     * Account password
+     */
+    @NotBlank(message = "Password is required")
+    private String password;
+}
+
+Request 4: ForgotPasswordRequest.java
+javapackage com.appverse.backend.dto.request;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import lombok.*;
+
+/**
+ * DTO for forgot password request.
+ * Triggers OTP email to the registered address.
+ * First step of password reset flow.
+ */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class ForgotPasswordRequest {
+
+    /**
+     * Registered email to send reset OTP to
+     */
+    @NotBlank(message = "Email is required")
+    @Email(message = "Please provide a valid email address")
+    private String email;
+}
+
+Request 5: ResetPasswordRequest.java
+javapackage com.appverse.backend.dto.request;
+
+import jakarta.validation.constraints.*;
+import lombok.*;
+
+/**
+ * DTO for password reset request.
+ * Used after OTP verification in
+ * forgot password flow.
+ * Contains new password with confirmation.
+ */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class ResetPasswordRequest {
+
+    /**
+     * Email address of the account
+     */
+    @NotBlank(message = "Email is required")
+    @Email(message = "Please provide a valid email address")
+    private String email;
+
+    /**
+     * Verified OTP code
+     */
+    @NotBlank(message = "OTP is required")
+    @Pattern(
+            regexp = "^[0-9]{6}$",
+            message = "OTP must be exactly 6 digits"
+    )
+    private String otp;
+
+    /**
+     * New password with security requirements
+     */
+    @NotBlank(message = "New password is required")
+    @Size(min = 8,
+            message = "Password must be at least 8 characters")
+    @Pattern(
+            regexp = "^(?=.*[a-z])(?=.*[A-Z])" +
+                    "(?=.*\\d)(?=.*[@$!%*?&])" +
+                    "[A-Za-z\\d@$!%*?&]{8,}$",
+            message = "Password must contain at least one " +
+                    "uppercase, lowercase, digit " +
+                    "and special character"
+    )
+    private String newPassword;
+
+    /**
+     * Confirm password must match newPassword
+     */
+    @NotBlank(message = "Confirm password is required")
+    private String confirmPassword;
+}
+
+Request 6: CategoryRequest.java
+javapackage com.appverse.backend.dto.request;
+
+import jakarta.validation.constraints.*;
+import lombok.*;
+
+/**
+ * DTO for creating or updating a Category.
+ * Used by ADMIN role only.
+ * Validated before saving to database.
+ */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class CategoryRequest {
+
+    /**
+     * Category name - must be unique
+     */
+    @NotBlank(message = "Category name is required")
+    @Size(min = 2, max = 100,
+            message = "Name must be between 2 and 100 characters")
+    private String name;
+
+    /**
+     * Optional description of the category
+     */
+    @Size(max = 255,
+            message = "Description cannot exceed 255 characters")
+    private String description;
+
+    /**
+     * Optional icon URL for the category
+     */
+    @Size(max = 500,
+            message = "Icon URL cannot exceed 500 characters")
+    private String iconUrl;
+}
+
+Request 7: AppRequest.java
+javapackage com.appverse.backend.dto.request;
+
+import jakarta.validation.constraints.*;
+import lombok.*;
+
+/**
+ * DTO for creating or updating an App.
+ * Used by DEVELOPER role only.
+ * Contains all app metadata for submission.
+ */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class AppRequest {
+
+    /**
+     * Name of the application
+     */
+    @NotBlank(message = "App name is required")
+    @Size(min = 2, max = 150,
+            message = "App name must be between 2 and 150 characters")
+    private String name;
+
+    /**
+     * Detailed description of the app
+     */
+    @NotBlank(message = "Description is required")
+    @Size(min = 10, max = 5000,
+            message = "Description must be between " +
+                    "10 and 5000 characters")
+    private String description;
+
+    /**
+     * Initial version number e.g. 1.0.0
+     */
+    @NotBlank(message = "Version is required")
+    @Pattern(
+            regexp = "^\\d+\\.\\d+\\.\\d+$",
+            message = "Version must be in format x.x.x " +
+                    "(e.g. 1.0.0)"
+    )
+    private String version;
+
+    /**
+     * Optional app icon URL
+     */
+    @Size(max = 500,
+            message = "Icon URL cannot exceed 500 characters")
+    private String iconUrl;
+
+    /**
+     * Download link or file path
+     */
+    @NotBlank(message = "Download URL is required")
+    @Size(max = 500,
+            message = "Download URL cannot exceed 500 characters")
+    private String downloadUrl;
+
+    /**
+     * App size in MB
+     */
+    @NotNull(message = "App size is required")
+    @DecimalMin(value = "0.1",
+            message = "App size must be at least 0.1 MB")
+    @DecimalMax(value = "5000.0",
+            message = "App size cannot exceed 5000 MB")
+    private Double sizeMb;
+
+    /**
+     * Category ID this app belongs to
+     */
+    @NotNull(message = "Category is required")
+    private Long categoryId;
+
+    /**
+     * Release notes for initial version
+     */
+    @Size(max = 2000,
+            message = "Release notes cannot exceed 2000 characters")
+    private String releaseNotes;
+}
+
+Request 8: AppVersionRequest.java
+javapackage com.appverse.backend.dto.request;
+
+import jakarta.validation.constraints.*;
+import lombok.*;
+
+/**
+ * DTO for uploading a new App version.
+ * Used by DEVELOPER role to release updates.
+ * Version must be unique per app.
+ */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class AppVersionRequest {
+
+    /**
+     * New version number
+     * Must follow semantic versioning x.x.x
+     */
+    @NotBlank(message = "Version is required")
+    @Pattern(
+            regexp = "^\\d+\\.\\d+\\.\\d+$",
+            message = "Version must be in format x.x.x " +
+                    "(e.g. 2.0.0)"
+    )
+    private String version;
+
+    /**
+     * What changed in this version
+     */
+    @NotBlank(message = "Release notes are required")
+    @Size(min = 10, max = 2000,
+            message = "Release notes must be between " +
+                    "10 and 2000 characters")
+    private String releaseNotes;
+
+    /**
+     * Download URL for this version
+     */
+    @NotBlank(message = "Download URL is required")
+    @Size(max = 500,
+            message = "Download URL cannot exceed 500 characters")
+    private String downloadUrl;
+
+    /**
+     * File size in MB for this version
+     */
+    @NotNull(message = "Size is required")
+    @DecimalMin(value = "0.1",
+            message = "Size must be at least 0.1 MB")
+    @DecimalMax(value = "5000.0",
+            message = "Size cannot exceed 5000 MB")
+    private Double sizeMb;
+}
+
+Request 9: ReviewRequest.java
+javapackage com.appverse.backend.dto.request;
+
+import jakarta.validation.constraints.*;
+import lombok.*;
+
+/**
+ * DTO for submitting an App review.
+ * Used by USER role only.
+ * Comment text is analyzed by AI for sentiment.
+ */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class ReviewRequest {
+
+    /**
+     * Rating between 1 and 5
+     */
+    @NotNull(message = "Rating is required")
+    @Min(value = 1, message = "Rating must be at least 1")
+    @Max(value = 5, message = "Rating cannot exceed 5")
+    private Integer rating;
+
+    /**
+     * Review comment text
+     * Sent to AI for sentiment analysis
+     */
+    @NotBlank(message = "Review comment is required")
+    @Size(min = 10, max = 1000,
+            message = "Comment must be between " +
+                    "10 and 1000 characters")
+    private String comment;
+}
+
+RESPONSE DTOs
+
+Response 1: ApiResponse.java
+javapackage com.appverse.backend.dto.response;
+
+import lombok.*;
+
+import java.time.LocalDateTime;
+
+/**
+ * Generic API response wrapper.
+ * Used for all success responses
+ * to maintain consistent response structure.
+ * @param <T> - type of data in response
+ */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class ApiResponse<T> {
+
+    /**
+     * Whether request was successful
+     */
+    private boolean success;
+
+    /**
+     * Human readable message
+     */
+    private String message;
+
+    /**
+     * Response data payload
+     */
+    private T data;
+
+    /**
+     * Timestamp of response
+     */
+    private LocalDateTime timestamp;
+
+    /**
+     * Static factory for success response
+     * @param message - success message
+     * @param data - response data
+     * @return ApiResponse with success=true
+     */
+    public static <T> ApiResponse<T> success(
+            String message, T data) {
+        return ApiResponse.<T>builder()
+                .success(true)
+                .message(message)
+                .data(data)
+                .timestamp(LocalDateTime.now())
+                .build();
+    }
+
+    /**
+     * Static factory for success with no data
+     * @param message - success message
+     * @return ApiResponse with success=true
+     */
+    public static <T> ApiResponse<T> success(String message) {
+        return ApiResponse.<T>builder()
+                .success(true)
+                .message(message)
+                .timestamp(LocalDateTime.now())
+                .build();
+    }
+
+    /**
+     * Static factory for error response
+     * @param message - error message
+     * @return ApiResponse with success=false
+     */
+    public static <T> ApiResponse<T> error(String message) {
+        return ApiResponse.<T>builder()
+                .success(false)
+                .message(message)
+                .timestamp(LocalDateTime.now())
+                .build();
+    }
+}
+
+Response 2: PageResponse.java
+javapackage com.appverse.backend.dto.response;
+
+import lombok.*;
+import org.springframework.data.domain.Page;
+
+import java.util.List;
+
+/**
+ * Generic paginated response wrapper.
+ * Wraps Spring Page object into clean response.
+ * Used for all paginated list endpoints.
+ * @param <T> - type of items in page
+ */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class PageResponse<T> {
+
+    /**
+     * List of items in current page
+     */
+    private List<T> content;
+
+    /**
+     * Current page number (0-based)
+     */
+    private int pageNumber;
+
+    /**
+     * Number of items per page
+     */
+    private int pageSize;
+
+    /**
+     * Total number of items across all pages
+     */
+    private long totalElements;
+
+    /**
+     * Total number of pages
+     */
+    private int totalPages;
+
+    /**
+     * Whether this is the last page
+     */
+    private boolean lastPage;
+
+    /**
+     * Whether this is the first page
+     */
+    private boolean firstPage;
+
+    /**
+     * Static factory to build from Spring Page object
+     * @param page - Spring Page object
+     * @return PageResponse
+     */
+    public static <T> PageResponse<T> from(Page<T> page) {
+        return PageResponse.<T>builder()
+                .content(page.getContent())
+                .pageNumber(page.getNumber())
+                .pageSize(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .lastPage(page.isLast())
+                .firstPage(page.isFirst())
+                .build();
+    }
+}
+
+Response 3: AuthResponse.java
+javapackage com.appverse.backend.dto.response;
+
+import com.appverse.backend.entity.User;
+import lombok.*;
+
+/**
+ * DTO for authentication response.
+ * Returned after successful login.
+ * Contains JWT token and basic user info.
+ */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class AuthResponse {
+
+    /**
+     * JWT access token for API calls
+     */
+    private String token;
+
+    /**
+     * Token type - always "Bearer"
+     */
+    private String tokenType = "Bearer";
+
+    /**
+     * Token expiry in milliseconds
+     */
+    private Long expiresIn;
+
+    /**
+     * Logged in user's id
+     */
+    private Long userId;
+
+    /**
+     * Logged in user's name
+     */
+    private String name;
+
+    /**
+     * Logged in user's email
+     */
+    private String email;
+
+    /**
+     * Logged in user's role
+     */
+    private User.Role role;
+}
+
+Response 4: UserResponse.java
+javapackage com.appverse.backend.dto.response;
+
+import com.appverse.backend.entity.User;
+import lombok.*;
+
+import java.time.LocalDateTime;
+
+/**
+ * DTO for user profile response.
+ * Excludes sensitive fields like password.
+ * Used for profile display and admin user list.
+ */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class UserResponse {
+
+    /** User id */
+    private Long id;
+
+    /** Full name */
+    private String name;
+
+    /** Email address */
+    private String email;
+
+    /** User role */
+    private User.Role role;
+
+    /** Account verification status */
+    private boolean isVerified;
+
+    /** Account active status */
+    private boolean isActive;
+
+    /** Account creation timestamp */
+    private LocalDateTime createdAt;
+
+    /**
+     * Static factory to map from User entity
+     * @param user - User entity
+     * @return UserResponse DTO
+     */
+    public static UserResponse from(User user) {
+        return UserResponse.builder()
+                .id(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .role(user.getRole())
+                .isVerified(user.isVerified())
+                .isActive(user.isActive())
+                .createdAt(user.getCreatedAt())
+                .build();
+    }
+}
+
+Response 5: CategoryResponse.java
+javapackage com.appverse.backend.dto.response;
+
+import com.appverse.backend.entity.Category;
+import lombok.*;
+
+import java.time.LocalDateTime;
+
+/**
+ * DTO for category response.
+ * Used in category listing and app details.
+ */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class CategoryResponse {
+
+    /** Category id */
+    private Long id;
+
+    /** Category name */
+    private String name;
+
+    /** Category description */
+    private String description;
+
+    /** Category icon URL */
+    private String iconUrl;
+
+    /** Whether category is active */
+    private boolean isActive;
+
+    /** Creation timestamp */
+    private LocalDateTime createdAt;
+
+    /**
+     * Static factory to map from Category entity
+     * @param category - Category entity
+     * @return CategoryResponse DTO
+     */
+    public static CategoryResponse from(Category category) {
+        return CategoryResponse.builder()
+                .id(category.getId())
+                .name(category.getName())
+                .description(category.getDescription())
+                .iconUrl(category.getIconUrl())
+                .isActive(category.isActive())
+                .createdAt(category.getCreatedAt())
+                .build();
+    }
+}
+
+Response 6: AppResponse.java
+javapackage com.appverse.backend.dto.response;
+
+import com.appverse.backend.entity.App;
+import lombok.*;
+
+import java.time.LocalDateTime;
+
+/**
+ * DTO for App response.
+ * Used in marketplace listing and app details.
+ * Contains developer and category info.
+ */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class AppResponse {
+
+    /** App id */
+    private Long id;
+
+    /** App name */
+    private String name;
+
+    /** App description */
+    private String description;
+
+    /** Current version */
+    private String version;
+
+    /** Icon URL */
+    private String iconUrl;
+
+    /** Download URL */
+    private String downloadUrl;
+
+    /** Total download count */
+    private Integer downloadCount;
+
+    /** Average rating */
+    private Double avgRating;
+
+    /** Total number of ratings */
+    private Integer totalRatings;
+
+    /** App size in MB */
+    private Double sizeMb;
+
+    /** App approval status */
+    private App.AppStatus status;
+
+    /** Whether app is featured */
+    private boolean isFeatured;
+
+    /** Category info */
+    private CategoryResponse category;
+
+    /** Developer info */
+    private UserResponse developer;
+
+    /** Creation timestamp */
+    private LocalDateTime createdAt;
+
+    /** Last updated timestamp */
+    private LocalDateTime updatedAt;
+
+    /**
+     * Static factory to map from App entity
+     * @param app - App entity
+     * @return AppResponse DTO
+     */
+    public static AppResponse from(App app) {
+        return AppResponse.builder()
+                .id(app.getId())
+                .name(app.getName())
+                .description(app.getDescription())
+                .version(app.getVersion())
+                .iconUrl(app.getIconUrl())
+                .downloadUrl(app.getDownloadUrl())
+                .downloadCount(app.getDownloadCount())
+                .avgRating(app.getAvgRating())
+                .totalRatings(app.getTotalRatings())
+                .sizeMb(app.getSizeMb())
+                .status(app.getStatus())
+                .isFeatured(app.isFeatured())
+                .category(CategoryResponse
+                        .from(app.getCategory()))
+                .developer(UserResponse
+                        .from(app.getDeveloper()))
+                .createdAt(app.getCreatedAt())
+                .updatedAt(app.getUpdatedAt())
+                .build();
+    }
+}
+
+Response 7: AppVersionResponse.java
+javapackage com.appverse.backend.dto.response;
+
+import com.appverse.backend.entity.AppVersion;
+import lombok.*;
+
+import java.time.LocalDateTime;
+
+/**
+ * DTO for App version history response.
+ * Used in developer console version history.
+ */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class AppVersionResponse {
+
+    /** Version id */
+    private Long id;
+
+    /** Version string */
+    private String version;
+
+    /** Release notes */
+    private String releaseNotes;
+
+    /** Download URL */
+    private String downloadUrl;
+
+    /** Size in MB */
+    private Double sizeMb;
+
+    /** Release timestamp */
+    private LocalDateTime releasedAt;
+
+    /**
+     * Static factory to map from AppVersion entity
+     * @param version - AppVersion entity
+     * @return AppVersionResponse DTO
+     */
+    public static AppVersionResponse from(AppVersion version) {
+        return AppVersionResponse.builder()
+                .id(version.getId())
+                .version(version.getVersion())
+                .releaseNotes(version.getReleaseNotes())
+                .downloadUrl(version.getDownloadUrl())
+                .sizeMb(version.getSizeMb())
+                .releasedAt(version.getReleasedAt())
+                .build();
+    }
+}
+
+Response 8: ReviewResponse.java
+javapackage com.appverse.backend.dto.response;
+
+import com.appverse.backend.entity.Review;
+import lombok.*;
+
+import java.time.LocalDateTime;
+
+/**
+ * DTO for Review response.
+ * Includes AI sentiment analysis results.
+ * Used in app details and review dashboard.
+ */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class ReviewResponse {
+
+    /** Review id */
+    private Long id;
+
+    /** Rating given */
+    private Integer rating;
+
+    /** Review comment */
+    private String comment;
+
+    /** AI sentiment result */
+    private Review.Sentiment sentiment;
+
+    /** AI sentiment confidence score */
+    private Double sentimentScore;
+
+    /** Whether flagged as fake */
+    private boolean isFake;
+
+    /** Whether approved to show */
+    private boolean isApproved;
+
+    /** Reviewer info */
+    private UserResponse user;
+
+    /** Creation timestamp */
+    private LocalDateTime createdAt;
+
+    /**
+     * Static factory to map from Review entity
+     * @param review - Review entity
+     * @return ReviewResponse DTO
+     */
+    public static ReviewResponse from(Review review) {
+        return ReviewResponse.builder()
+                .id(review.getId())
+                .rating(review.getRating())
+                .comment(review.getComment())
+                .sentiment(review.getSentiment())
+                .sentimentScore(review.getSentimentScore())
+                .isFake(review.isFake())
+                .isApproved(review.isApproved())
+                .user(UserResponse.from(review.getUser()))
+                .createdAt(review.getCreatedAt())
+                .build();
+    }
+}
+
+Response 9: DownloadResponse.java
+javapackage com.appverse.backend.dto.response;
+
+import com.appverse.backend.entity.Download;
+import lombok.*;
+
+import java.time.LocalDateTime;
+
+/**
+ * DTO for Download record response.
+ * Used in download history and analytics.
+ */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class DownloadResponse {
+
+    /** Download record id */
+    private Long id;
+
+    /** App that was downloaded */
+    private AppResponse app;
+
+    /** User who downloaded */
+    private UserResponse user;
+
+    /** Download timestamp */
+    private LocalDateTime downloadedAt;
+
+    /**
+     * Static factory to map from Download entity
+     * @param download - Download entity
+     * @return DownloadResponse DTO
+     */
+    public static DownloadResponse from(Download download) {
+        return DownloadResponse.builder()
+                .id(download.getId())
+                .app(AppResponse.from(download.getApp()))
+                .user(UserResponse.from(download.getUser()))
+                .downloadedAt(download.getDownloadedAt())
+                .build();
+    }
+}
+
+Phase 2 Step 4 Complete ✅
+✅ 9 Request DTOs with full validations
+✅ 9 Response DTOs with static from() mappers
+✅ ApiResponse<T> generic wrapper
+✅ PageResponse<T> for pagination
+✅ Password pattern validation
+✅ Version format validation (x.x.x)
+✅ OTP pattern validation (6 digits)
+✅ Size, Min, Max, NotBlank validations
+✅ Static factory methods in all responses
+✅ Comments on every field and class
+✅ Lombok on all DTOs
+
+Tell me "Start Phase 2 Step 5" and I'll generate the Email Service with Gmail OTP! 🚀You said: Start phase 2 step 5Start phase 2 step 512:55 PMClaude responded: Phase 2 - Step 5: Email Service with Gmail OTPPhase 2 - Step 5: Email Service with Gmail OTP
+Package Structure
+service/
+├── EmailService.java          → Interface
+└── impl/
+    └── EmailServiceImpl.java  → Implementation
+
+util/
+└── OtpUtil.java               → OTP Generator
+
+config/
+└── MailConfig.java            → Mail Configuration
+
+entity/
+└── (OtpVerification.java already created in Step 1)
+
+Step 1: OtpUtil.java
+Package: com.appverse.backend.util
+javapackage com.appverse.backend.util;
+
+import org.springframework.stereotype.Component;
+
+import java.security.SecureRandom;
+
+/**
+ * Utility class for OTP generation.
+ * Uses SecureRandom for cryptographically
+ * secure OTP generation.
+ * Follows Singleton pattern via @Component.
+ */
+@Component
+public class OtpUtil {
+
+    /**
+     * SecureRandom instance for secure OTP generation
+     * More secure than Random for security purposes
+     */
+    private final SecureRandom secureRandom = new SecureRandom();
+
+    /**
+     * OTP length - 6 digits
+     */
+    private static final int OTP_LENGTH = 6;
+
+    /**
+     * Generates a random 6-digit OTP
+     * Uses SecureRandom for security
+     * @return 6-digit OTP string
+     */
+    public String generateOtp() {
+        // Generate random number between 100000 and 999999
+        int otp = 100000 + secureRandom.nextInt(900000);
+        return String.valueOf(otp);
+    }
+
+    /**
+     * Validates OTP format
+     * Must be exactly 6 digits
+     * @param otp - OTP string to validate
+     * @return true if valid format
+     */
+    public boolean isValidOtpFormat(String otp) {
+        return otp != null &&
+                otp.matches("^[0-9]{6}$");
+    }
+
+    /**
+     * Masks email for display in responses
+     * e.g. gopidi.anugna@gmail.com
+     * becomes g*****a@gmail.com
+     * @param email - email to mask
+     * @return masked email string
+     */
+    public String maskEmail(String email) {
+        if (email == null || !email.contains("@")) {
+            return email;
+        }
+
+        String[] parts = email.split("@");
+        String localPart = parts[0];
+        String domain = parts[1];
+
+        if (localPart.length() <= 2) {
+            return localPart + "@" + domain;
+        }
+
+        // Show first and last character only
+        String masked = localPart.charAt(0) +
+                "*".repeat(localPart.length() - 2) +
+                localPart.charAt(localPart.length() - 1);
+
+        return masked + "@" + domain;
+    }
+}
+
+Step 2: MailConfig.java
+Package: com.appverse.backend.config
+javapackage com.appverse.backend.config;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
+
+import java.util.Properties;
+
+/**
+ * Mail Configuration class for Gmail SMTP.
+ * Configures JavaMailSender bean with
+ * Gmail SMTP settings for OTP delivery.
+ * Values loaded from application.properties.
+ */
+@Configuration
+public class MailConfig {
+
+    /**
+     * Gmail SMTP host
+     */
+    @Value("${spring.mail.host}")
+    private String mailHost;
+
+    /**
+     * Gmail SMTP port (587 for TLS)
+     */
+    @Value("${spring.mail.port}")
+    private int mailPort;
+
+    /**
+     * Gmail address used as sender
+     */
+    @Value("${spring.mail.username}")
+    private String mailUsername;
+
+    /**
+     * Gmail App Password (not account password)
+     */
+    @Value("${spring.mail.password}")
+    private String mailPassword;
+
+    /**
+     * Configures and returns JavaMailSender bean
+     * Sets up Gmail SMTP with TLS authentication
+     * @return configured JavaMailSender
+     */
+    @Bean
+    public JavaMailSender javaMailSender() {
+
+        JavaMailSenderImpl mailSender =
+                new JavaMailSenderImpl();
+
+        // Set SMTP server details
+        mailSender.setHost(mailHost);
+        mailSender.setPort(mailPort);
+        mailSender.setUsername(mailUsername);
+        mailSender.setPassword(mailPassword);
+
+        // Set mail properties
+        Properties props = mailSender.getJavaMailProperties();
+
+        // Use SMTP protocol
+        props.put("mail.transport.protocol", "smtp");
+
+        // Enable SMTP authentication
+        props.put("mail.smtp.auth", "true");
+
+        // Enable STARTTLS for secure connection
+        props.put("mail.smtp.starttls.enable", "true");
+        props.put("mail.smtp.starttls.required", "true");
+
+        // Connection timeout settings
+        props.put("mail.smtp.connectiontimeout", "5000");
+        props.put("mail.smtp.timeout", "5000");
+        props.put("mail.smtp.writetimeout", "5000");
+
+        // Enable debug logging for mail (disable in production)
+        props.put("mail.debug", "false");
+
+        return mailSender;
+    }
+}
+
+Step 3: EmailService.java (Interface)
+Package: com.appverse.backend.service
+javapackage com.appverse.backend.service;
+
+/**
+ * Service interface for Email operations.
+ * Defines contracts for all email
+ * sending operations in the application.
+ * Implemented by EmailServiceImpl.
+ */
+public interface EmailService {
+
+    /**
+     * Sends OTP email for account registration
+     * @param toEmail - recipient email
+     * @param otp - generated OTP code
+     * @param userName - recipient name
+     */
+    void sendRegistrationOtp(
+            String toEmail,
+            String otp,
+            String userName
+    );
+
+    /**
+     * Sends OTP email for password reset
+     * @param toEmail - recipient email
+     * @param otp - generated OTP code
+     * @param userName - recipient name
+     */
+    void sendPasswordResetOtp(
+            String toEmail,
+            String otp,
+            String userName
+    );
+
+    /**
+     * Sends welcome email after
+     * successful account verification
+     * @param toEmail - recipient email
+     * @param userName - recipient name
+     */
+    void sendWelcomeEmail(
+            String toEmail,
+            String userName
+    );
+
+    /**
+     * Sends notification when
+     * developer app is approved by admin
+     * @param toEmail - developer email
+     * @param userName - developer name
+     * @param appName - approved app name
+     */
+    void sendAppApprovalEmail(
+            String toEmail,
+            String userName,
+            String appName
+    );
+
+    /**
+     * Sends notification when
+     * developer app is rejected by admin
+     * @param toEmail - developer email
+     * @param userName - developer name
+     * @param appName - rejected app name
+     * @param reason - rejection reason
+     */
+    void sendAppRejectionEmail(
+            String toEmail,
+            String userName,
+            String appName,
+            String reason
+    );
+}
+
+Step 4: EmailServiceImpl.java
+Package: com.appverse.backend.service.impl
+javapackage com.appverse.backend.service.impl;
+
+import com.appverse.backend.service.EmailService;
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+
+/**
+ * Implementation of EmailService.
+ * Handles all email sending operations
+ * using Gmail SMTP via JavaMailSender.
+ * All methods run asynchronously (@Async)
+ * to avoid blocking the main thread.
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class EmailServiceImpl implements EmailService {
+
+    /**
+     * JavaMailSender injected from MailConfig
+     */
+    private final JavaMailSender mailSender;
+
+    /**
+     * Sender email from application.properties
+     */
+    @Value("${spring.mail.username}")
+    private String senderEmail;
+
+    /**
+     * App name for email branding
+     */
+    private static final String APP_NAME = "AppVerse AI";
+
+    // =============================================
+    // REGISTRATION OTP EMAIL
+    // =============================================
+
+    /**
+     * Sends OTP email for new user registration.
+     * Runs asynchronously to not block API response.
+     * @param toEmail - recipient email
+     * @param otp - 6-digit OTP code
+     * @param userName - user's name for personalization
+     */
+    @Override
+    @Async
+    public void sendRegistrationOtp(
+            String toEmail,
+            String otp,
+            String userName) {
+
+        log.info("Sending registration OTP to: {}", toEmail);
+
+        try {
+            MimeMessage message =
+                    mailSender.createMimeMessage();
+            MimeMessageHelper helper =
+                    new MimeMessageHelper(
+                            message, true, "UTF-8");
+
+            helper.setFrom(senderEmail);
+            helper.setTo(toEmail);
+            helper.setSubject(
+                    APP_NAME + " - Email Verification OTP");
+            helper.setText(
+                    buildRegistrationOtpTemplate(
+                            userName, otp),
+                    true // isHtml = true
+            );
+
+            mailSender.send(message);
+            log.info("Registration OTP sent successfully to: {}",
+                    toEmail);
+
+        } catch (MessagingException e) {
+            log.error(
+                    "Failed to send registration OTP to {}: {}",
+                    toEmail, e.getMessage());
+        }
+    }
+
+    // =============================================
+    // PASSWORD RESET OTP EMAIL
+    // =============================================
+
+    /**
+     * Sends OTP email for password reset.
+     * Runs asynchronously to not block API response.
+     * @param toEmail - recipient email
+     * @param otp - 6-digit OTP code
+     * @param userName - user's name for personalization
+     */
+    @Override
+    @Async
+    public void sendPasswordResetOtp(
+            String toEmail,
+            String otp,
+            String userName) {
+
+        log.info("Sending password reset OTP to: {}",
+                toEmail);
+
+        try {
+            MimeMessage message =
+                    mailSender.createMimeMessage();
+            MimeMessageHelper helper =
+                    new MimeMessageHelper(
+                            message, true, "UTF-8");
+
+            helper.setFrom(senderEmail);
+            helper.setTo(toEmail);
+            helper.setSubject(
+                    APP_NAME + " - Password Reset OTP");
+            helper.setText(
+                    buildPasswordResetOtpTemplate(
+                            userName, otp),
+                    true
+            );
+
+            mailSender.send(message);
+            log.info(
+                    "Password reset OTP sent successfully to: {}",
+                    toEmail);
+
+        } catch (MessagingException e) {
+            log.error(
+                    "Failed to send password reset OTP to {}: {}",
+                    toEmail, e.getMessage());
+        }
+    }
+
+    // =============================================
+    // WELCOME EMAIL
+    // =============================================
+
+    /**
+     * Sends welcome email after account verification.
+     * Runs asynchronously.
+     * @param toEmail - recipient email
+     * @param userName - user's name
+     */
+    @Override
+    @Async
+    public void sendWelcomeEmail(
+            String toEmail,
+            String userName) {
+
+        log.info("Sending welcome email to: {}", toEmail);
+
+        try {
+            MimeMessage message =
+                    mailSender.createMimeMessage();
+            MimeMessageHelper helper =
+                    new MimeMessageHelper(
+                            message, true, "UTF-8");
+
+            helper.setFrom(senderEmail);
+            helper.setTo(toEmail);
+            helper.setSubject(
+                    "Welcome to " + APP_NAME + "! 🎉");
+            helper.setText(
+                    buildWelcomeTemplate(userName),
+                    true
+            );
+
+            mailSender.send(message);
+            log.info("Welcome email sent successfully to: {}",
+                    toEmail);
+
+        } catch (MessagingException e) {
+            log.error(
+                    "Failed to send welcome email to {}: {}",
+                    toEmail, e.getMessage());
+        }
+    }
+
+    // =============================================
+    // APP APPROVAL EMAIL
+    // =============================================
+
+    /**
+     * Sends app approval notification to developer.
+     * @param toEmail - developer email
+     * @param userName - developer name
+     * @param appName - approved app name
+     */
+    @Override
+    @Async
+    public void sendAppApprovalEmail(
+            String toEmail,
+            String userName,
+            String appName) {
+
+        log.info("Sending app approval email to: {}",
+                toEmail);
+
+        try {
+            MimeMessage message =
+                    mailSender.createMimeMessage();
+            MimeMessageHelper helper =
+                    new MimeMessageHelper(
+                            message, true, "UTF-8");
+
+            helper.setFrom(senderEmail);
+            helper.setTo(toEmail);
+            helper.setSubject(
+                    APP_NAME + " - App Approved! 🚀");
+            helper.setText(
+                    buildAppApprovalTemplate(
+                            userName, appName),
+                    true
+            );
+
+            mailSender.send(message);
+            log.info(
+                    "App approval email sent to: {}",
+                    toEmail);
+
+        } catch (MessagingException e) {
+            log.error(
+                    "Failed to send approval email to {}: {}",
+                    toEmail, e.getMessage());
+        }
+    }
+
+    // =============================================
+    // APP REJECTION EMAIL
+    // =============================================
+
+    /**
+     * Sends app rejection notification to developer.
+     * @param toEmail - developer email
+     * @param userName - developer name
+     * @param appName - rejected app name
+     * @param reason - rejection reason from admin
+     */
+    @Override
+    @Async
+    public void sendAppRejectionEmail(
+            String toEmail,
+            String userName,
+            String appName,
+            String reason) {
+
+        log.info("Sending app rejection email to: {}",
+                toEmail);
+
+        try {
+            MimeMessage message =
+                    mailSender.createMimeMessage();
+            MimeMessageHelper helper =
+                    new MimeMessageHelper(
+                            message, true, "UTF-8");
+
+            helper.setFrom(senderEmail);
+            helper.setTo(toEmail);
+            helper.setSubject(
+                    APP_NAME + " - App Submission Update");
+            helper.setText(
+                    buildAppRejectionTemplate(
+                            userName, appName, reason),
+                    true
+            );
+
+            mailSender.send(message);
+            log.info(
+                    "App rejection email sent to: {}",
+                    toEmail);
+
+        } catch (MessagingException e) {
+            log.error(
+                    "Failed to send rejection email to {}: {}",
+                    toEmail, e.getMessage());
+        }
+    }
+
+    // =============================================
+    // HTML EMAIL TEMPLATES
+    // =============================================
+
+    /**
+     * Builds HTML template for registration OTP email
+     * @param userName - user name
+     * @param otp - OTP code
+     * @return HTML string
+     */
+    private String buildRegistrationOtpTemplate(
+            String userName, String otp) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport"
+                     content="width=device-width,
+                     initial-scale=1.0">
+                </head>
+                <body style="margin:0;padding:0;
+                 font-family:Arial,sans-serif;
+                 background-color:#f4f6f9;">
+                
+                  <table width="100%%" cellpadding="0"
+                   cellspacing="0"
+                   style="background-color:#f4f6f9;
+                   padding:40px 0;">
+                    <tr>
+                      <td align="center">
+                        <table width="600" cellpadding="0"
+                         cellspacing="0"
+                         style="background-color:#ffffff;
+                         border-radius:12px;
+                         overflow:hidden;
+                         box-shadow:0 4px 20px
+                         rgba(0,0,0,0.1);">
+                
+                          <!-- HEADER -->
+                          <tr>
+                            <td style="background:linear-gradient(
+                             135deg,#667eea 0%%,#764ba2 100%%);
+                             padding:40px;text-align:center;">
+                              <h1 style="color:#ffffff;
+                               margin:0;font-size:28px;
+                               font-weight:bold;">
+                                🚀 AppVerse AI
+                              </h1>
+                              <p style="color:#e8eaf6;
+                               margin:8px 0 0;font-size:14px;">
+                                Smart App Marketplace
+                              </p>
+                            </td>
+                          </tr>
+                
+                          <!-- BODY -->
+                          <tr>
+                            <td style="padding:40px;">
+                              <h2 style="color:#333333;
+                               margin:0 0 16px;
+                               font-size:22px;">
+                                Verify Your Email Address
+                              </h2>
+                              <p style="color:#666666;
+                               font-size:15px;
+                               line-height:1.6;margin:0 0 24px;">
+                                Hi <strong>%s</strong>,<br><br>
+                                Welcome to AppVerse AI! Please use
+                                the OTP below to verify your email
+                                address and activate your account.
+                              </p>
+                
+                              <!-- OTP BOX -->
+                              <div style="background:linear-gradient(
+                               135deg,#667eea 0%%,#764ba2 100%%);
+                               border-radius:12px;padding:30px;
+                               text-align:center;margin:24px 0;">
+                                <p style="color:#e8eaf6;margin:0 0 8px;
+                                 font-size:13px;text-transform:uppercase;
+                                 letter-spacing:2px;">
+                                  Your Verification OTP
+                                </p>
+                                <h1 style="color:#ffffff;
+                                 font-size:48px;font-weight:bold;
+                                 margin:0;letter-spacing:12px;
+                                 font-family:monospace;">
+                                  %s
+                                </h1>
+                              </div>
+                
+                              <!-- WARNING -->
+                              <div style="background:#fff3cd;
+                               border-left:4px solid #ffc107;
+                               border-radius:4px;
+                               padding:16px;margin:24px 0;">
+                                <p style="color:#856404;
+                                 margin:0;font-size:13px;">
+                                  ⚠️ This OTP is valid for
+                                  <strong>5 minutes only</strong>.
+                                  Do not share it with anyone.
+                                </p>
+                              </div>
+                
+                              <p style="color:#999999;
+                               font-size:13px;margin:24px 0 0;">
+                                If you didn't create an account,
+                                please ignore this email.
+                              </p>
+                            </td>
+                          </tr>
+                
+                          <!-- FOOTER -->
+                          <tr>
+                            <td style="background:#f8f9fa;
+                             padding:24px;text-align:center;
+                             border-top:1px solid #eeeeee;">
+                              <p style="color:#999999;
+                               font-size:12px;margin:0;">
+                                © 2024 AppVerse AI.
+                                All rights reserved.
+                              </p>
+                            </td>
+                          </tr>
+                
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </body>
+                </html>
+                """.formatted(userName, otp);
+    }
+
+    /**
+     * Builds HTML template for password reset OTP email
+     * @param userName - user name
+     * @param otp - OTP code
+     * @return HTML string
+     */
+    private String buildPasswordResetOtpTemplate(
+            String userName, String otp) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                  <meta charset="UTF-8">
+                </head>
+                <body style="margin:0;padding:0;
+                 font-family:Arial,sans-serif;
+                 background-color:#f4f6f9;">
+                
+                  <table width="100%%" cellpadding="0"
+                   cellspacing="0"
+                   style="background-color:#f4f6f9;
+                   padding:40px 0;">
+                    <tr>
+                      <td align="center">
+                        <table width="600" cellpadding="0"
+                         cellspacing="0"
+                         style="background-color:#ffffff;
+                         border-radius:12px;
+                         overflow:hidden;
+                         box-shadow:0 4px 20px
+                         rgba(0,0,0,0.1);">
+                
+                          <!-- HEADER -->
+                          <tr>
+                            <td style="background:linear-gradient(
+                             135deg,#f093fb 0%%,#f5576c 100%%);
+                             padding:40px;text-align:center;">
+                              <h1 style="color:#ffffff;
+                               margin:0;font-size:28px;">
+                                🔐 Password Reset
+                              </h1>
+                              <p style="color:#fce4ec;
+                               margin:8px 0 0;font-size:14px;">
+                                AppVerse AI Security
+                              </p>
+                            </td>
+                          </tr>
+                
+                          <!-- BODY -->
+                          <tr>
+                            <td style="padding:40px;">
+                              <h2 style="color:#333333;
+                               margin:0 0 16px;">
+                                Reset Your Password
+                              </h2>
+                              <p style="color:#666666;
+                               font-size:15px;line-height:1.6;
+                               margin:0 0 24px;">
+                                Hi <strong>%s</strong>,<br><br>
+                                We received a request to reset
+                                your password. Use the OTP
+                                below to proceed.
+                              </p>
+                
+                              <!-- OTP BOX -->
+                              <div style="background:linear-gradient(
+                               135deg,#f093fb 0%%,#f5576c 100%%);
+                               border-radius:12px;padding:30px;
+                               text-align:center;margin:24px 0;">
+                                <p style="color:#fce4ec;
+                                 margin:0 0 8px;font-size:13px;
+                                 text-transform:uppercase;
+                                 letter-spacing:2px;">
+                                  Password Reset OTP
+                                </p>
+                                <h1 style="color:#ffffff;
+                                 font-size:48px;font-weight:bold;
+                                 margin:0;letter-spacing:12px;
+                                 font-family:monospace;">
+                                  %s
+                                </h1>
+                              </div>
+                
+                              <!-- WARNING -->
+                              <div style="background:#fff3cd;
+                               border-left:4px solid #ffc107;
+                               border-radius:4px;padding:16px;
+                               margin:24px 0;">
+                                <p style="color:#856404;
+                                 margin:0;font-size:13px;">
+                                  ⚠️ This OTP expires in
+                                  <strong>5 minutes</strong>.
+                                  Never share this with anyone.
+                                </p>
+                              </div>
+                
+                              <p style="color:#999999;
+                               font-size:13px;margin:24px 0 0;">
+                                If you didn't request a password
+                                reset, please secure your account
+                                immediately.
+                              </p>
+                            </td>
+                          </tr>
+                
+                          <!-- FOOTER -->
+                          <tr>
+                            <td style="background:#f8f9fa;
+                             padding:24px;text-align:center;
+                             border-top:1px solid #eeeeee;">
+                              <p style="color:#999999;
+                               font-size:12px;margin:0;">
+                                © 2024 AppVerse AI.
+                                All rights reserved.
+                              </p>
+                            </td>
+                          </tr>
+                
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </body>
+                </html>
+                """.formatted(userName, otp);
+    }
+
+    /**
+     * Builds HTML template for welcome email
+     * @param userName - user name
+     * @return HTML string
+     */
+    private String buildWelcomeTemplate(String userName) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="margin:0;padding:0;
+                 font-family:Arial,sans-serif;
+                 background-color:#f4f6f9;">
+                
+                  <table width="100%%" cellpadding="0"
+                   cellspacing="0"
+                   style="background-color:#f4f6f9;
+                   padding:40px 0;">
+                    <tr>
+                      <td align="center">
+                        <table width="600" cellpadding="0"
+                         cellspacing="0"
+                         style="background-color:#ffffff;
+                         border-radius:12px;overflow:hidden;
+                         box-shadow:0 4px 20px
+                         rgba(0,0,0,0.1);">
+                
+                          <!-- HEADER -->
+                          <tr>
+                            <td style="background:linear-gradient(
+                             135deg,#4facfe 0%%,#00f2fe 100%%);
+                             padding:40px;text-align:center;">
+                              <h1 style="color:#ffffff;
+                               margin:0;font-size:32px;">
+                                🎉 Welcome Aboard!
+                              </h1>
+                            </td>
+                          </tr>
+                
+                          <!-- BODY -->
+                          <tr>
+                            <td style="padding:40px;">
+                              <h2 style="color:#333333;
+                               margin:0 0 16px;">
+                                Hi %s, You're all set!
+                              </h2>
+                              <p style="color:#666666;
+                               font-size:15px;line-height:1.6;">
+                                Your AppVerse AI account has been
+                                successfully verified. You can now
+                                explore thousands of amazing apps!
+                              </p>
+                
+                              <!-- FEATURES -->
+                              <div style="background:#f8f9fa;
+                               border-radius:8px;padding:24px;
+                               margin:24px 0;">
+                                <h3 style="color:#333;margin:0 0 16px;">
+                                  What you can do:
+                                </h3>
+                                <p style="color:#555;margin:8px 0;">
+                                  🔍 Browse and search apps
+                                </p>
+                                <p style="color:#555;margin:8px 0;">
+                                  ⭐ Rate and review apps
+                                </p>
+                                <p style="color:#555;margin:8px 0;">
+                                  🤖 Get AI-powered recommendations
+                                </p>
+                                <p style="color:#555;margin:8px 0;">
+                                  📥 Download your favorite apps
+                                </p>
+                              </div>
+                            </td>
+                          </tr>
+                
+                          <!-- FOOTER -->
+                          <tr>
+                            <td style="background:#f8f9fa;
+                             padding:24px;text-align:center;
+                             border-top:1px solid #eeeeee;">
+                              <p style="color:#999999;
+                               font-size:12px;margin:0;">
+                                © 2024 AppVerse AI.
+                                All rights reserved.
+                              </p>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </body>
+                </html>
+                """.formatted(userName);
+    }
+
+    /**
+     * Builds HTML template for app approval email
+     * @param userName - developer name
+     * @param appName - approved app name
+     * @return HTML string
+     */
+    private String buildAppApprovalTemplate(
+            String userName, String appName) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="margin:0;padding:0;
+                 font-family:Arial,sans-serif;
+                 background-color:#f4f6f9;">
+                  <table width="100%%" cellpadding="0"
+                   cellspacing="0"
+                   style="background-color:#f4f6f9;
+                   padding:40px 0;">
+                    <tr>
+                      <td align="center">
+                        <table width="600" cellpadding="0"
+                         cellspacing="0"
+                         style="background-color:#ffffff;
+                         border-radius:12px;overflow:hidden;">
+                
+                          <tr>
+                            <td style="background:linear-gradient(
+                             135deg,#43e97b 0%%,#38f9d7 100%%);
+                             padding:40px;text-align:center;">
+                              <h1 style="color:#ffffff;margin:0;">
+                                ✅ App Approved!
+                              </h1>
+                            </td>
+                          </tr>
+                
+                          <tr>
+                            <td style="padding:40px;">
+                              <p style="color:#666666;
+                               font-size:15px;line-height:1.6;">
+                                Hi <strong>%s</strong>,<br><br>
+                                Great news! Your app
+                                <strong>"%s"</strong> has been
+                                approved and is now live on
+                                the AppVerse AI marketplace!
+                                Users can now discover and
+                                download your app.
+                              </p>
+                            </td>
+                          </tr>
+                
+                          <tr>
+                            <td style="background:#f8f9fa;
+                             padding:24px;text-align:center;">
+                              <p style="color:#999999;
+                               font-size:12px;margin:0;">
+                                © 2024 AppVerse AI.
+                              </p>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </body>
+                </html>
+                """.formatted(userName, appName);
+    }
+
+    /**
+     * Builds HTML template for app rejection email
+     * @param userName - developer name
+     * @param appName - rejected app name
+     * @param reason - rejection reason
+     * @return HTML string
+     */
+    private String buildAppRejectionTemplate(
+            String userName,
+            String appName,
+            String reason) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="margin:0;padding:0;
+                 font-family:Arial,sans-serif;
+                 background-color:#f4f6f9;">
+                  <table width="100%%" cellpadding="0"
+                   cellspacing="0"
+                   style="background-color:#f4f6f9;
+                   padding:40px 0;">
+                    <tr>
+                      <td align="center">
+                        <table width="600" cellpadding="0"
+                         cellspacing="0"
+                         style="background-color:#ffffff;
+                         border-radius:12px;overflow:hidden;">
+                
+                          <tr>
+                            <td style="background:linear-gradient(
+                             135deg,#f093fb 0%%,#f5576c 100%%);
+                             padding:40px;text-align:center;">
+                              <h1 style="color:#ffffff;margin:0;">
+                                App Submission Update
+                              </h1>
+                            </td>
+                          </tr>
+                
+                          <tr>
+                            <td style="padding:40px;">
+                              <p style="color:#666666;
+                               font-size:15px;line-height:1.6;">
+                                Hi <strong>%s</strong>,<br><br>
+                                After review, your app
+                                <strong>"%s"</strong> was not
+                                approved at this time.<br><br>
+                                <strong>Reason:</strong> %s
+                                <br><br>
+                                Please make the necessary changes
+                                and resubmit your app.
+                              </p>
+                            </td>
+                          </tr>
+                
+                          <tr>
+                            <td style="background:#f8f9fa;
+                             padding:24px;text-align:center;">
+                              <p style="color:#999999;
+                               font-size:12px;margin:0;">
+                                © 2024 AppVerse AI.
+                              </p>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </body>
+                </html>
+                """.formatted(userName, appName, reason);
+    }
+}
+
+Step 5: OTP Cleanup Scheduler
+Package: com.appverse.backend.util
+javapackage com.appverse.backend.util;
+
+import com.appverse.backend.repository.OtpVerificationRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+
+/**
+ * Scheduled task to clean up expired OTPs.
+ * Runs every 10 minutes automatically.
+ * Prevents database from filling up
+ * with old expired OTP records.
+ */
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class OtpCleanupScheduler {
+
+    /**
+     * OTP repository for database operations
+     */
+    private final OtpVerificationRepository
+            otpVerificationRepository;
+
+    /**
+     * Deletes all expired OTPs from database.
+     * Runs every 10 minutes (600000 ms).
+     * @Transactional ensures atomic deletion
+     */
+    @Scheduled(fixedRate = 600000)
+    @Transactional
+    public void cleanupExpiredOtps() {
+        log.info("Running OTP cleanup scheduler at: {}",
+                LocalDateTime.now());
+
+        otpVerificationRepository
+                .deleteExpiredOtps(LocalDateTime.now());
+
+        log.info("Expired OTPs cleaned up successfully");
+    }
+}
+
+Phase 2 Step 5 Complete ✅
+✅ OtpUtil - secure OTP generation
+✅ MailConfig - Gmail SMTP configuration
+✅ EmailService interface - 5 email methods
+✅ EmailServiceImpl - full implementation
+✅ 5 professional HTML email templates
+    ✅ Registration OTP (purple gradient)
+    ✅ Password Reset OTP (pink gradient)
+    ✅ Welcome email (blue gradient)
+    ✅ App Approval email (green gradient)
+    ✅ App Rejection email
+✅ @Async on all email methods
+✅ OtpCleanupScheduler - auto cleanup
+✅ Logging in every method
+✅ Comments on every class and method
+
+Tell me "Start Phase 2 Step 6" and I'll generate JWT Utility + Security Config! 🚀You said: Start phase 2 step 6Start phase 2 step 65:58 PM2 / 2Claude responded: Phase 2 - Step 6: JWT Utility + Security ConfigPhase 2 - Step 6: JWT Utility + Security Config
+Package Structure
+security/
+├── JwtUtil.java                → JWT token operations
+├── JwtAuthenticationFilter.java → Request filter
+└── CustomUserDetailsService.java → Load user from DB
+
+config/
+└── SecurityConfig.java         → Main security config
+
+Step 1: JwtUtil.java
+Package: com.appverse.backend.security
+javapackage com.appverse.backend.security;
+
+import io.jsonwebtoken.*;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Component;
+
+import java.security.Key;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
+
+/**
+ * JWT Utility class for token operations.
+ * Handles token generation, validation,
+ * and claims extraction.
+ * Follows Singleton pattern via @Component.
+ * Uses HMAC-SHA256 signing algorithm.
+ */
+@Component
+@Slf4j
+public class JwtUtil {
+
+    /**
+     * Secret key for JWT signing
+     * Loaded from application.properties
+     */
+    @Value("${app.jwt.secret}")
+    private String jwtSecret;
+
+    /**
+     * Token expiration time in milliseconds
+     * Default: 86400000 ms = 24 hours
+     */
+    @Value("${app.jwt.expiration}")
+    private Long jwtExpiration;
+
+    // =============================================
+    // TOKEN GENERATION
+    // =============================================
+
+    /**
+     * Generates JWT token for authenticated user
+     * Includes email, role, and userId as claims
+     * @param userDetails - authenticated user details
+     * @param userId - user's database id
+     * @param role - user's role
+     * @return signed JWT token string
+     */
+    public String generateToken(
+            UserDetails userDetails,
+            Long userId,
+            String role) {
+
+        log.debug("Generating JWT token for user: {}",
+                userDetails.getUsername());
+
+        // Extra claims to include in token
+        Map<String, Object> extraClaims = new HashMap<>();
+        extraClaims.put("userId", userId);
+        extraClaims.put("role", role);
+
+        return buildToken(
+                extraClaims,
+                userDetails,
+                jwtExpiration
+        );
+    }
+
+    /**
+     * Builds JWT token with claims and expiry
+     * @param extraClaims - additional claims
+     * @param userDetails - user details
+     * @param expiration - expiry in ms
+     * @return signed JWT string
+     */
+    private String buildToken(
+            Map<String, Object> extraClaims,
+            UserDetails userDetails,
+            Long expiration) {
+
+        return Jwts.builder()
+                // Set custom claims (userId, role)
+                .setClaims(extraClaims)
+                // Set subject as email
+                .setSubject(userDetails.getUsername())
+                // Set issued at time
+                .setIssuedAt(new Date(
+                        System.currentTimeMillis()))
+                // Set expiry time
+                .setExpiration(new Date(
+                        System.currentTimeMillis()
+                                + expiration))
+                // Sign with secret key
+                .signWith(getSigningKey(),
+                        SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    // =============================================
+    // TOKEN VALIDATION
+    // =============================================
+
+    /**
+     * Validates JWT token against user details
+     * Checks email match and expiry
+     * @param token - JWT token string
+     * @param userDetails - user details to validate against
+     * @return true if token is valid
+     */
+    public boolean isTokenValid(
+            String token,
+            UserDetails userDetails) {
+
+        final String email = extractEmail(token);
+        boolean isValid = email.equals(
+                userDetails.getUsername())
+                && !isTokenExpired(token);
+
+        log.debug("Token validation for {}: {}",
+                email, isValid);
+
+        return isValid;
+    }
+
+    /**
+     * Checks if token has expired
+     * @param token - JWT token string
+     * @return true if expired
+     */
+    private boolean isTokenExpired(String token) {
+        return extractExpiration(token)
+                .before(new Date());
+    }
+
+    // =============================================
+    // CLAIMS EXTRACTION
+    // =============================================
+
+    /**
+     * Extracts email (subject) from token
+     * @param token - JWT token string
+     * @return email string
+     */
+    public String extractEmail(String token) {
+        return extractClaim(
+                token,
+                Claims::getSubject
+        );
+    }
+
+    /**
+     * Extracts userId from token claims
+     * @param token - JWT token string
+     * @return userId as Long
+     */
+    public Long extractUserId(String token) {
+        Claims claims = extractAllClaims(token);
+        return Long.valueOf(
+                claims.get("userId").toString()
+        );
+    }
+
+    /**
+     * Extracts role from token claims
+     * @param token - JWT token string
+     * @return role string
+     */
+    public String extractRole(String token) {
+        Claims claims = extractAllClaims(token);
+        return claims.get("role").toString();
+    }
+
+    /**
+     * Extracts expiration date from token
+     * @param token - JWT token string
+     * @return expiration Date
+     */
+    public Date extractExpiration(String token) {
+        return extractClaim(
+                token,
+                Claims::getExpiration
+        );
+    }
+
+    /**
+     * Generic claim extractor using Function
+     * @param token - JWT token string
+     * @param claimsResolver - function to extract claim
+     * @return extracted claim value
+     */
+    public <T> T extractClaim(
+            String token,
+            Function<Claims, T> claimsResolver) {
+
+        final Claims claims = extractAllClaims(token);
+        return claimsResolver.apply(claims);
+    }
+
+    /**
+     * Extracts all claims from token
+     * Verifies signature during parsing
+     * @param token - JWT token string
+     * @return Claims object
+     */
+    private Claims extractAllClaims(String token) {
+        try {
+            return Jwts.parserBuilder()
+                    .setSigningKey(getSigningKey())
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+        } catch (ExpiredJwtException e) {
+            log.error("JWT token expired: {}",
+                    e.getMessage());
+            throw e;
+        } catch (UnsupportedJwtException e) {
+            log.error("JWT token unsupported: {}",
+                    e.getMessage());
+            throw e;
+        } catch (MalformedJwtException e) {
+            log.error("JWT token malformed: {}",
+                    e.getMessage());
+            throw e;
+        } catch (SignatureException e) {
+            log.error("JWT signature invalid: {}",
+                    e.getMessage());
+            throw e;
+        }
+    }
+
+    // =============================================
+    // SIGNING KEY
+    // =============================================
+
+    /**
+     * Creates HMAC-SHA signing key from secret
+     * Decodes base64 secret and creates Key object
+     * @return Key object for signing/verification
+     */
+    private Key getSigningKey() {
+        byte[] keyBytes = Decoders.BASE64
+                .decode(encodeSecret());
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    /**
+     * Base64 encodes the JWT secret
+     * Ensures secret meets minimum key length
+     * @return Base64 encoded secret string
+     */
+    private String encodeSecret() {
+        return java.util.Base64.getEncoder()
+                .encodeToString(
+                        jwtSecret.getBytes()
+                );
+    }
+
+    /**
+     * Returns token expiration time in ms
+     * Used in AuthResponse to inform client
+     * @return expiration time in milliseconds
+     */
+    public Long getExpirationTime() {
+        return jwtExpiration;
+    }
+}
+
+Step 2: CustomUserDetailsService.java
+Package: com.appverse.backend.security
+package com.appverse.backend.security;
+
+import com.appverse.backend.entity.User;
+import com.appverse.backend.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+
+import java.util.Collections;
+
+/**
+ * Custom implementation of UserDetailsService.
+ * Loads user from database by email.
+ * Used by Spring Security during authentication.
+ * Maps User entity to Spring Security UserDetails.
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class CustomUserDetailsService
+        implements UserDetailsService {
+
+    /**
+     * User repository for database lookup
+     */
+    private final UserRepository userRepository;
+
+    /**
+     * Loads user by email (used as username)
+     * Called by Spring Security during login
+     * Maps role to GrantedAuthority with ROLE_ prefix
+     * @param email - user email (username)
+     * @return UserDetails object for Spring Security
+     * @throws UsernameNotFoundException if not found
+     */
+    @Override
+    public UserDetails loadUserByUsername(String email)
+            throws UsernameNotFoundException {
+
+        log.debug("Loading user by email: {}", email);
+
+        // Find user in database
+        User user = userRepository
+                .findByEmail(email)
+                .orElseThrow(() ->  {
+                    log.error(
+                            "User not found with email: {}",
+                            email);
+                    return new UsernameNotFoundException(
+                            "User not found: " + email);
+                });
+
+        log.debug("User found: {} with role: {}",
+                email, user.getRole());
+
+        // Build Spring Security UserDetails
+        return org.springframework.security
+                .core.userdetails.User
+                .builder()
+                // Email as username
+                .username(user.getEmail())
+                // BCrypt hashed password
+                .password(user.getPassword())
+                // Role with ROLE_ prefix
+                .authorities(Collections.singletonList(
+                        new SimpleGrantedAuthority(
+                                "ROLE_" + user.getRole()
+                                        .name())
+                ))
+                // Map isActive to enabled
+                .accountExpired(false)
+                .accountLocked(!user.isActive())
+                .credentialsExpired(false)
+                // Map isActive to enabled
+                .disabled(!user.isActive())
+                .build();
+    }
+}
+
+Step 3: JwtAuthenticationFilter.java
+Package: com.appverse.backend.security
+package com.appverse.backend.security;
+
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.UnsupportedJwtException;
+import io.jsonwebtoken.security.SignatureException;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication
+        .UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context
+        .SecurityContextHolder;
+import org.springframework.security.core.userdetails
+        .UserDetails;
+import org.springframework.security.web.authentication
+        .WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+
+/**
+ * JWT Authentication Filter.
+ * Intercepts every HTTP request exactly once.
+ * Extracts and validates JWT from Authorization header.
+ * Sets authentication in SecurityContext if valid.
+ * Extends OncePerRequestFilter for single execution.
+ */
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class JwtAuthenticationFilter
+        extends OncePerRequestFilter {
+
+    /**
+     * JWT utility for token operations
+     */
+    private final JwtUtil jwtUtil;
+
+    /**
+     * Custom user details service
+     */
+    private final CustomUserDetailsService
+            customUserDetailsService;
+
+    /**
+     * Authorization header name
+     */
+    private static final String AUTH_HEADER =
+            "Authorization";
+
+    /**
+     * Bearer token prefix
+     */
+    private static final String BEARER_PREFIX =
+            "Bearer ";
+
+    /**
+     * Core filter method - runs on every request.
+     * Extracts JWT → Validates → Sets Authentication
+     * Skips if no token or token is invalid.
+     * @param request - HTTP request
+     * @param response - HTTP response
+     * @param filterChain - next filter in chain
+     */
+    @Override
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain)
+            throws ServletException, IOException {
+
+        try {
+            // Step 1: Extract JWT from header
+            String jwt = extractTokenFromRequest(request);
+
+            // Step 2: Skip if no token found
+            if (jwt == null) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            // Step 3: Extract email from token
+            String email = jwtUtil.extractEmail(jwt);
+
+            // Step 4: Process if email found
+            // and not already authenticated
+            if (email != null &&
+                    SecurityContextHolder.getContext()
+                            .getAuthentication() == null) {
+
+                // Step 5: Load user from database
+                UserDetails userDetails =
+                        customUserDetailsService
+                                .loadUserByUsername(email);
+
+                // Step 6: Validate token
+                if (jwtUtil.isTokenValid(
+                        jwt, userDetails)) {
+
+                    // Step 7: Create authentication token
+                    UsernamePasswordAuthenticationToken
+                            authToken =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails,
+                                    null,
+                                    userDetails
+                                            .getAuthorities()
+                            );
+
+                    // Step 8: Set request details
+                    authToken.setDetails(
+                            new WebAuthenticationDetailsSource()
+                                    .buildDetails(request)
+                    );
+
+                    // Step 9: Set in SecurityContext
+                    SecurityContextHolder.getContext()
+                            .setAuthentication(authToken);
+
+                    log.debug(
+                            "JWT authenticated user: {}",
+                            email);
+                }
+            }
+
+        } catch (ExpiredJwtException e) {
+            log.error("JWT token expired: {}",
+                    e.getMessage());
+            sendErrorResponse(response,
+                    HttpServletResponse.SC_UNAUTHORIZED,
+                    "JWT token has expired");
+            return;
+
+        } catch (MalformedJwtException |
+                 UnsupportedJwtException |
+                 SignatureException e) {
+            log.error("Invalid JWT token: {}",
+                    e.getMessage());
+            sendErrorResponse(response,
+                    HttpServletResponse.SC_UNAUTHORIZED,
+                    "Invalid JWT token");
+            return;
+
+        } catch (Exception e) {
+            log.error(
+                    "JWT authentication error: {}",
+                    e.getMessage());
+            sendErrorResponse(response,
+                    HttpServletResponse.SC_UNAUTHORIZED,
+                    "Authentication failed");
+            return;
+        }
+
+        // Continue to next filter
+        filterChain.doFilter(request, response);
+    }
+
+    /**
+     * Extracts JWT token from Authorization header
+     * Header format: "Bearer <token>"
+     * @param request - HTTP request
+     * @return JWT token string or null
+     */
+    private String extractTokenFromRequest(
+            HttpServletRequest request) {
+
+        String authHeader = request
+                .getHeader(AUTH_HEADER);
+
+        if (StringUtils.hasText(authHeader) &&
+                authHeader.startsWith(BEARER_PREFIX)) {
+            return authHeader
+                    .substring(BEARER_PREFIX.length());
+        }
+
+        return null;
+    }
+
+    /**
+     * Sends JSON error response for auth failures
+     * @param response - HTTP response
+     * @param status - HTTP status code
+     * @param message - error message
+     */
+    private void sendErrorResponse(
+            HttpServletResponse response,
+            int status,
+            String message) throws IOException {
+
+        response.setStatus(status);
+        response.setContentType(
+                "application/json");
+        response.getWriter().write(
+                "{\"success\":false," +
+                        "\"message\":\"" +
+                        message + "\"}"
+        );
+    }
+}
+
+Step 4: SecurityConfig.java
+Package: com.appverse.backend.config
+javapackage com.appverse.backend.config;
+
+import com.appverse.backend.security
+        .CustomUserDetailsService;
+import com.appverse.backend.security
+        .JwtAuthenticationFilter;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication
+        .AuthenticationManager;
+import org.springframework.security.authentication
+        .AuthenticationProvider;
+import org.springframework.security.authentication.dao
+        .DaoAuthenticationProvider;
+import org.springframework.security.config.annotation
+        .authentication.configuration
+        .AuthenticationConfiguration;
+import org.springframework.security.config.annotation
+        .method.configuration
+        .EnableMethodSecurity;
+import org.springframework.security.config.annotation
+        .web.builders.HttpSecurity;
+import org.springframework.security.config.annotation
+        .web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation
+        .web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http
+        .SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt
+        .BCryptPasswordEncoder;
+import org.springframework.security.crypto.password
+        .PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication
+        .UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors
+        .CorsConfigurationSource;
+import org.springframework.web.cors
+        .UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+import java.util.List;
+
+/**
+ * Main Spring Security Configuration class.
+ * Configures JWT-based stateless authentication.
+ * Defines public and protected endpoints.
+ * Sets up CORS for React frontend.
+ * Enables method-level security annotations.
+ */
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity(
+        prePostEnabled = true  // Enables @PreAuthorize
+)
+@RequiredArgsConstructor
+@Slf4j
+public class SecurityConfig {
+
+    /**
+     * Custom user details service
+     */
+    private final CustomUserDetailsService
+            customUserDetailsService;
+
+    /**
+     * JWT authentication filter
+     */
+    private final JwtAuthenticationFilter
+            jwtAuthenticationFilter;
+
+    // =============================================
+    // PUBLIC ENDPOINTS - No JWT required
+    // =============================================
+
+    /**
+     * List of endpoints accessible without JWT token
+     */
+    private static final String[] PUBLIC_ENDPOINTS = {
+            // Auth endpoints
+            "/api/auth/**",
+            // Swagger UI
+            "/swagger-ui/**",
+            "/swagger-ui.html",
+            "/api-docs/**",
+            "/v3/api-docs/**",
+            // Public app browsing
+            "/api/apps/public/**",
+            "/api/categories/public/**",
+            // Actuator health check
+            "/actuator/health"
+    };
+
+    // =============================================
+    // SECURITY FILTER CHAIN
+    // =============================================
+
+    /**
+     * Main security filter chain configuration.
+     * - Disables CSRF (not needed for REST APIs)
+     * - Enables CORS for React frontend
+     * - Sets stateless session (JWT based)
+     * - Configures public vs protected endpoints
+     * - Adds JWT filter before auth filter
+     * @param http - HttpSecurity builder
+     * @return configured SecurityFilterChain
+     */
+    @Bean
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http) throws Exception {
+
+        log.info("Configuring Security Filter Chain");
+
+        http
+                // Disable CSRF - not needed for REST
+                .csrf(AbstractHttpConfigurer::disable)
+
+                // Enable CORS with our config
+                .cors(cors -> cors
+                        .configurationSource(
+                                corsConfigurationSource())
+                )
+
+                // Configure endpoint access rules
+                .authorizeHttpRequests(auth -> auth
+
+                        // Allow public endpoints
+                        .requestMatchers(PUBLIC_ENDPOINTS)
+                        .permitAll()
+
+                        // Admin only endpoints
+                        .requestMatchers(
+                                "/api/admin/**")
+                        .hasRole("ADMIN")
+
+                        // Developer only endpoints
+                        .requestMatchers(
+                                "/api/developer/**")
+                        .hasRole("DEVELOPER")
+
+                        // All other requests need auth
+                        .anyRequest()
+                        .authenticated()
+                )
+
+                // Stateless session - no server sessions
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(
+                                SessionCreationPolicy
+                                        .STATELESS)
+                )
+
+                // Set custom auth provider
+                .authenticationProvider(
+                        authenticationProvider())
+
+                // Add JWT filter before Spring's filter
+                .addFilterBefore(
+                        jwtAuthenticationFilter,
+                        UsernamePasswordAuthenticationFilter
+                                .class
+                );
+
+        log.info("Security Filter Chain configured");
+
+        return http.build();
+    }
+
+    // =============================================
+    // CORS CONFIGURATION
+    // =============================================
+
+    /**
+     * CORS configuration for React frontend.
+     * Allows requests from React dev server.
+     * Configure for production domain in deployment.
+     * @return CorsConfigurationSource
+     */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+
+        CorsConfiguration configuration =
+                new CorsConfiguration();
+
+        // Allow React frontend origins
+        configuration.setAllowedOrigins(Arrays.asList(
+                "http://localhost:3000",  // React dev
+                "http://localhost:5173"   // Vite dev
+        ));
+
+        // Allow standard HTTP methods
+        configuration.setAllowedMethods(Arrays.asList(
+                "GET", "POST", "PUT",
+                "DELETE", "PATCH", "OPTIONS"
+        ));
+
+        // Allow all headers
+        configuration.setAllowedHeaders(
+                List.of("*"));
+
+        // Allow Authorization header in response
+        configuration.setExposedHeaders(
+                List.of("Authorization"));
+
+        // Allow credentials (cookies, auth headers)
+        configuration.setAllowCredentials(true);
+
+        // Cache preflight for 1 hour
+        configuration.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source =
+                new UrlBasedCorsConfigurationSource();
+
+        // Apply to all endpoints
+        source.registerCorsConfiguration(
+                "/**", configuration);
+
+        return source;
+    }
+
+    // =============================================
+    // AUTHENTICATION PROVIDER
+    // =============================================
+
+    /**
+     * Authentication provider using database.
+     * Uses CustomUserDetailsService to load users.
+     * Uses BCrypt for password verification.
+     * @return configured AuthenticationProvider
+     */
+    @Bean
+    public AuthenticationProvider authenticationProvider() {
+
+        DaoAuthenticationProvider provider =
+                new DaoAuthenticationProvider();
+
+        // Set custom user details service
+        provider.setUserDetailsService(
+                customUserDetailsService);
+
+        // Set BCrypt password encoder
+        provider.setPasswordEncoder(passwordEncoder());
+
+        return provider;
+    }
+
+    // =============================================
+    // AUTHENTICATION MANAGER
+    // =============================================
+
+    /**
+     * Authentication manager bean.
+     * Used in AuthService for manual authentication.
+     * @param config - auth configuration
+     * @return AuthenticationManager
+     */
+    @Bean
+    public AuthenticationManager authenticationManager(
+            AuthenticationConfiguration config)
+            throws Exception {
+
+        return config.getAuthenticationManager();
+    }
+
+    // =============================================
+    // PASSWORD ENCODER
+    // =============================================
+
+    /**
+     * BCrypt password encoder bean.
+     * Strength 12 for good security/performance balance.
+     * Used for hashing and verifying passwords.
+     * @return BCryptPasswordEncoder instance
+     */
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder(12);
+    }
+}
+
+Step 5: Update application.properties
+Add this to your existing application.properties:
+properties# ===========================
+# ASYNC CONFIG
+# ===========================
+spring.task.execution.pool.core-size=5
+spring.task.execution.pool.max-size=10
+spring.task.execution.pool.queue-capacity=25
+spring.task.execution.thread-name-prefix=AppVerse-Async-
+
+# ===========================
+# SCHEDULING CONFIG
+# ===========================
+spring.task.scheduling.pool.size=5
+
+Step 6: Enable Async in Main Class
+Update AppverseBackendApplication.java:
+javapackage com.appverse.backend;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure
+        .SpringBootApplication;
+import org.springframework.scheduling.annotation
+        .EnableAsync;
+import org.springframework.scheduling.annotation
+        .EnableScheduling;
+
+/**
+ * Main entry point for AppVerse AI Backend.
+ * EnableScheduling - for OTP cleanup scheduler
+ * EnableAsync - for async email sending
+ */
+@SpringBootApplication
+@EnableScheduling
+@EnableAsync
+public class AppverseBackendApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(
+                AppverseBackendApplication.class,
+                args);
+        System.out.println(
+                "===========================================");
+        System.out.println(
+                "  AppVerse AI Backend Started Successfully ");
+        System.out.println(
+                "  Swagger: http://localhost:8080" +
+                        "/swagger-ui.html");
+        System.out.println(
+                "===========================================");
+    }
+}
+
+How JWT Flow Works
+1. User Login Request
+        ↓
+2. AuthenticationManager validates credentials
+        ↓
+3. CustomUserDetailsService loads user from DB
+        ↓
+4. BCrypt verifies password
+        ↓
+5. JwtUtil generates token with claims
+   (email, userId, role)
+        ↓
+6. Token returned to client
+        ↓
+7. Client sends token in every request
+   Header: Authorization: Bearer <token>
+        ↓
+8. JwtAuthenticationFilter intercepts request
+        ↓
+9. JwtUtil extracts and validates token
+        ↓
+10. SecurityContext set with user authentication
+        ↓
+11. Controller receives authenticated request
+
+Phase 2 Step 6 Complete ✅
+✅ JwtUtil - token generation & validation
+✅ CustomUserDetailsService - DB user loading
+✅ JwtAuthenticationFilter - request interception
+✅ SecurityConfig - full security setup
+✅ BCrypt password encoder (strength 12)
+✅ CORS config for React (localhost:3000/5173)
+✅ Public endpoints configured
+✅ Role-based access (ADMIN/DEVELOPER/USER)
+✅ @EnableMethodSecurity for @PreAuthorize
+✅ @EnableAsync for email sending
+✅ @EnableScheduling for OTP cleanup
+✅ Stateless JWT sessions
+✅ Logging throughout
+✅ Comments on every method
+
+Tell me "Start Phase 2 Step 7" and I'll generate the Auth Service + Auth Controller with full Register → OTP → Verify → Login flow! 🚀
